@@ -10,7 +10,7 @@ public enum VoteType { Initial, Final }
 public sealed class GameSettings
 {
     public int MaximumPlayers { get; set; } = 35;
-    public int MinimumPlayersToStart { get; set; } = 35;
+    public int MinimumPlayersToStart { get; set; } = 3;
     public double DurationScale { get; set; } = 1;
     public int MaximumRooms { get; set; } = 100;
     public int RoleRevealSeconds { get; set; } = 30;

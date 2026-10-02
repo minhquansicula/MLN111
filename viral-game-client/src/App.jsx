@@ -197,12 +197,12 @@ function HomePage() {
             <span>được số đông tin.</span>
           </h1>
           <p className="hero-description">
-            Một thông tin đang lan truyền. 35 người, những mảnh bằng chứng khác
+            Một thông tin đang lan truyền. Một lớp học, những mảnh bằng chứng khác
             nhau. Bạn sẽ tin điều gì khi áp lực bắt đầu?
           </p>
           <div className="hero-facts">
             <span>
-              <Users size={17} /> 35 người chơi
+              <Users size={17} /> 3 - 35 người chơi
             </span>
             <span>
               <Clock3 size={17} /> 15 phút
