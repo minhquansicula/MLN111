@@ -1,0 +1,52 @@
+using ViralGame.Server;
+using System.Text.Json;
+
+var checks = 0;
+void Check(bool condition, string label) { if (!condition) throw new Exception("FAIL: " + label); checks++; Console.WriteLine("PASS " + label); }
+GameRoom Room(params Verdict?[] votes) {
+    var room = new GameRoom { Code = "TEST", HostToken = "host-secret", Phase = GamePhase.Reveal };
+    for (var i = 0; i < votes.Length; i++) room.Players.Add(new Player { Name = "Player " + i, SessionToken = "secret-" + i, FinalVote = votes[i], EvidenceId = "E01" });
+    return room;
+}
+var empty = VoteService.Calculate(Room(null, null, null));
+Check(empty.Winner == "Draw" && empty.ClassVerdict == null && empty.Final.NoVote == 3, "No votes produces draw, not an arbitrary verdict");
+var tie = VoteService.Calculate(Room(Verdict.True, Verdict.Misleading, null));
+Check(tie.Winner == "Draw" && tie.ClassVerdict == null, "Equal leading counts produce draw");
+var unrelated = VoteService.Calculate(Room(Verdict.False, Verdict.False, Verdict.Misleading));
+Check(unrelated.Winner == "Draw" && unrelated.ClassVerdict == "False", "Neither side wins on an unrelated leading verdict");
+var manipulation = VoteService.Calculate(Room(Verdict.True, Verdict.True, Verdict.False));
+Check(manipulation.Winner == "Manipulator", "Manipulator target wins");
+var truth = VoteService.Calculate(Room(Verdict.Misleading, Verdict.Misleading, null));
+Check(truth.Winner == "Truth" && truth.FinalCorrectPercent == 66.7, "Truth result uses all-player denominator");
+var plurality = VoteService.Calculate(Room(Verdict.Misleading, Verdict.Misleading, Verdict.True, Verdict.False, Verdict.NotEnoughEvidence));
+Check(plurality.Winner == "Truth", "Unique plurality is intentional even below 50 percent");
+Check(VoteService.Calculate(Room()).FinalCorrectPercent == 0, "Empty summaries avoid division by zero");
+var changed = Room(Verdict.True, Verdict.Misleading, null);
+changed.Players[0].InitialVote = Verdict.False;
+changed.Players[2].InitialVote = Verdict.False;
+Check(VoteService.Calculate(changed).ChangedOpinion == 1, "Changed opinion excludes missing initial or final votes");
+var settings = new GameSettings();
+Check(Enum.GetValues<GamePhase>().Sum(settings.Duration) == 900, "Default phase durations total exactly 15 minutes");
+var projector = new SnapshotService(settings);
+var privateRoom = Room(Verdict.Misleading, Verdict.True, null);
+privateRoom.Players[0].Role = PlayerRole.FactChecker;
+privateRoom.Players[0].VerifyTokens = 2;
+privateRoom.Phase = GamePhase.RoleReveal;
+var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+JsonElement Snapshot(string? playerId) => JsonSerializer.SerializeToElement(projector.Create(privateRoom, playerId), jsonOptions);
+var host = Snapshot(null);
+Check(host.GetProperty("player").ValueKind == JsonValueKind.Null, "Host receives no private player DTO");
+Check(!host.ToString().Contains("host-secret") && !host.ToString().Contains("secret-0"), "Session tokens never appear in snapshots");
+var own = Snapshot(privateRoom.Players[0].Id);
+Check(own.GetProperty("player").GetProperty("role").GetString() == "FactChecker", "Player receives own role");
+Check(own.GetProperty("player").GetProperty("privateEvidence").ValueKind == JsonValueKind.Null, "Evidence hidden before Investigation");
+Check(own.GetProperty("room").GetProperty("scenario").ValueKind == JsonValueKind.Null, "Scenario hidden during RoleReveal");
+Check(!own.GetProperty("room").GetProperty("players")[0].TryGetProperty("role", out _), "Public player projection omits role");
+privateRoom.Phase = GamePhase.Investigation;
+var card = Snapshot(privateRoom.Players[0].Id).GetProperty("player").GetProperty("privateEvidence");
+Check(card.GetProperty("verificationResult").ValueKind == JsonValueKind.Null, "Verification explanation hidden before verify");
+privateRoom.Players[0].VerifiedEvidence.Add("E01");
+Check(Snapshot(privateRoom.Players[0].Id).GetProperty("player").GetProperty("privateEvidence").GetProperty("isVerified").GetBoolean(), "Private verification available to owner");
+Check(!Snapshot(privateRoom.Players[1].Id).GetProperty("player").GetProperty("privateEvidence").GetProperty("isVerified").GetBoolean(), "Duplicate private card does not leak another player's verification");
+Check(Snapshot(null).GetProperty("room").GetProperty("result").ValueKind == JsonValueKind.Null, "Result hidden during investigation");
+Console.WriteLine($"All {checks} rule/privacy checks passed.");

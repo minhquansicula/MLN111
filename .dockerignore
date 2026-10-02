@@ -1,0 +1,8 @@
+node_modules
+.artifacts
+.git
+.vs
+bin
+obj
+viral-game-client/node_modules
+viral-game-client/dist

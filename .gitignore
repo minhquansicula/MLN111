@@ -1,0 +1,9 @@
+**/node_modules/
+**/dist/
+**/bin/
+**/obj/
+.artifacts/
+*.log
+.env
+.vs/
+ViralGame.Server/wwwroot/

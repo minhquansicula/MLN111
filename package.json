@@ -1,0 +1,12 @@
+{
+  "name": "viral-truth-under-pressure",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs",
+    "start": "node scripts/start.mjs"
+  }
+}
