@@ -119,7 +119,7 @@ export const CaseView = ({ onFinish }) => {
             })}
           </div>
 
-          <Button variant="primary" style={{ width: "100%" }} onClick={() => setStep("FINAL_VERDICT")}>
+          <Button variant="primary" style={{ width: "100%", marginTop: "24px" }} onClick={() => setStep("FINAL_VERDICT")}>
             Kết thúc điều tra <ArrowRight size={18} />
           </Button>
         </div>

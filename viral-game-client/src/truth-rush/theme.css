@@ -231,6 +231,7 @@ button { color: inherit; }
 .tr-home-copy { display: flex; flex-direction: column; align-items: flex-start; }
 .tr-home-copy > .tr-pill { margin: 24px 0 16px; }
 .tr-home-copy h1 { max-width: 720px; font-size: clamp(3.4rem, 7.2vw, 6.6rem); line-height: 1.15; letter-spacing: -.065em; text-transform: uppercase; }
+.tr-home-copy h1:focus { outline: none; }
 .tr-home-copy h1 em {
   color: var(--tr-accent);
   font-style: normal;

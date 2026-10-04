@@ -49,10 +49,10 @@ export function PostMedia({ data }) {
     case "statistics":
       graphic = <Frame label={data.mediaAlt}>
         <text x="48" y="62" fill="#c6d6eb" fontSize="21">SỐ CA TRƯỢT MÔN</text>
-        <text x="660" y="89" textAnchor="end" fill="#ff8298" fontSize="50" fontWeight="800">+300%</text>
         <path d="M78 315H632" stroke="#8299b7" strokeWidth="2" />
         <rect x="144" y="253" width="136" height="60" rx="6" fill="#608dca" />
-          <rect x="416" y="73" width="136" height="240" rx="6" fill="#ff8298" />
+        <rect x="416" y="73" width="136" height="240" rx="6" fill="#ff8298" />
+        <text x="660" y="89" textAnchor="end" fill="#ff8298" fontSize="50" fontWeight="800">+300%</text>
         <text x="212" y="342" textAnchor="middle" fill="#bbcbe0" fontSize="19">Kỳ trước</text>
         <text x="484" y="342" textAnchor="middle" fill="#bbcbe0" fontSize="19">Kỳ này</text>
         <text x="48" y="91" fill="#8196b4" fontSize="16">Biểu đồ trong bài đăng</text>
