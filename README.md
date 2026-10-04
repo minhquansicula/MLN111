@@ -1,107 +1,135 @@
-# VIRAL: Truth Under Pressure
+# TRUTH RUSH
 
-Trò chơi lớp học bằng tiếng Việt về thông tin sai lệch và tư duy phản biện. 35 người chơi + 1 host; React/Vite + ASP.NET Core/SignalR; dữ liệu nằm trong RAM. Mỗi trận chạy tự động trong 15 phút.
+Game web cá nhân về kiểm chứng thông tin, tư duy phản biện và chia sẻ có trách nhiệm. Người chơi điều tra 8 bài đăng viral trong một lượt, dùng số điểm kiểm tra có hạn, đưa ra phán quyết với độ tự tin và nhận phản hồi theo từng quyết định.
 
-## Chạy nhanh
+Ứng dụng dùng React/Vite và ASP.NET Core 9. Chế độ solo chạy ngay trong trình duyệt; chế độ lớp học thêm mã lớp, thống kê và bảng xếp hạng. Không cần tài khoản hay database.
 
-Môi trường đã kiểm chứng: Node.js 24 và .NET SDK 9. Không cần database.
+## Chạy local
 
-Tại thư mục gốc:
+Yêu cầu Node.js 20+ và .NET SDK 9.
 
-~~~powershell
+```powershell
 npm run setup
 npm run dev
-~~~
+```
 
-Mở **http://localhost:5173**. Bấm tạo phòng trên tab host, rồi mở 3 tab khác để tham gia bằng 3 tên. Các tab dùng phiên riêng và không ghi đè nhau. Nhấn Start để chạy trận.
-
-- Development: tối thiểu 3 người; tại 3 người có đủ 3 vai trò.
-- Chạy thử đủ lớp: **npm run dev -- --classroom** (yêu cầu 35 người).
-- Frontend: cổng 5173; backend: cổng 5001. Vite chuyển tiếp SignalR sang backend.
-- Ctrl+C trong cửa sổ chạy sẽ dừng cả hai server.
-
-Để mở trên điện thoại cùng Wi-Fi, dùng địa chỉ IPv4 của máy chạy game, ví dụ http://192.168.x.x:5173. Không dùng localhost trên điện thoại. Mạng phải cho phép các thiết bị kết nối tới máy host và cổng tương ứng. Trên mạng nội bộ nên mở trang host bằng cùng địa chỉ LAN trước khi sao chép link mời.
-
-## Bản đóng gói cho lớp học
-
-~~~powershell
-npm run build
-npm start
-~~~
-
-Mở **http://localhost:5001** hoặc địa chỉ LAN của máy. Bản build chứa frontend, font và backend trong **.artifacts/publish**; chỉ cần ASP.NET Core Runtime 9 để chạy bản đã đóng gói. Production luôn yêu cầu đủ 35 người, dùng đúng thời lượng 15 phút. Chỉ chạy **một instance** vì không có database/distributed state.
-
-Có thể chuyển thư mục publish sang máy chủ có runtime phù hợp. Khi triển khai Internet, đặt phía sau HTTPS reverse proxy có hỗ trợ WebSocket và không scale nhiều instance. Repository chưa cấu hình một nhà cung cấp hosting cụ thể.
+Mở [http://localhost:5173](http://localhost:5173). Frontend chạy ở cổng 5173 và chuyển tiếp `/api` sang backend ở cổng 5001.
 
 ## Luồng chơi
 
-| Giai đoạn | Thời lượng | Hành động |
-|---|---:|---|
-| Nhận vai trò | 30 giây | Mỗi người chỉ thấy vai trò riêng |
-| Tin đang lan truyền | 45 giây | Đọc cùng một bài đăng |
-| Nhận định ban đầu | 30 giây | Mỗi người gửi một phiếu không thể sửa |
-| Điều tra | 3 phút | Đọc, chia sẻ, kiểm chứng; chat đóng |
-| Thảo luận | 6 phút | Chat, chia sẻ, Verify và Boost |
-| Kết luận cuối cùng | 30 giây | Một phiếu cuối; các kỹ năng đóng |
-| Hé lộ | 2 phút 30 giây | Đáp án, giải thích, vai trò, thao túng |
-| Báo cáo | 1 phút 15 giây | Thống kê rồi tự kết thúc |
+1. Nhập tên, chọn solo hoặc nhập mã lớp.
+2. Đọc bài đăng và ghi lại nhận định ban đầu.
+3. Dùng Investigation Points để mở những bằng chứng quan trọng.
+4. Chọn phán quyết cuối, độ tự tin và hành động có trách nhiệm.
+5. Xem lời giải, điểm chi tiết và bằng chứng mạnh đã bỏ lỡ.
+6. Hoàn thành đủ 8 hồ sơ để nhận kết quả trên thang 800 điểm.
 
-Host chỉ tạo phòng, bắt đầu, quan sát và dừng khẩn cấp. Sau Start không cần thao tác chuyển giai đoạn.
+Tiến độ được lưu trong `localStorage`, nên tải lại trang không làm mất lượt chơi.
 
-## Quy tắc đã chốt
+Ngân hàng có **một bộ đầy đủ gồm 8 hồ sơ**, mỗi lượt chơi xuyên suốt trên thang 800 điểm:
 
-- 35 người: 25 User, 5 Fact Checker, 5 Manipulator. Phân vai ngẫu nhiên trên server.
-- Fact Checker có 2 Verify, dùng trên thẻ riêng hoặc thẻ công khai. Kết quả thẻ riêng chỉ công khai khi thẻ được chính người đó chia sẻ.
-- Manipulator có 2 Boost, chỉ dùng trong Discussion với thẻ công khai chưa boost. Boost không sửa nội dung, không tiết lộ người thực hiện.
-- 7 thẻ tình huống được phân phối đều, mỗi người một thẻ. Các bản sao gộp thành một thẻ công khai với danh sách người chia sẻ.
-- Không vote được tính riêng là NO_VOTE, không tự đổi thành một verdict. Phần trăm dùng tổng người chơi trong trận làm mẫu số.
-- Lựa chọn có số phiếu cao nhất **duy nhất** quyết định kết luận của lớp. Đây là plurality, không bắt buộc vượt 50%. Hòa hoặc không có phiếu: DRAW. Lựa chọn dẫn đầu không khớp mục tiêu bên nào: DRAW.
-- Changed Opinion chỉ đếm người có cả hai phiếu và hai lựa chọn khác nhau.
-- Chat tối đa 200 ký tự, 3 giây giữa hai tin nhắn. Giữ 200 tin gần nhất.
-- Scenario và các số liệu nghiên cứu là **hư cấu để học tập**, đã gắn nhãn trong giao diện.
-- Confidence, âm thanh và các tính năng ngoài MVP chưa đưa vào bản này.
+- 4 hồ sơ ban đầu để làm quen với cách kiểm chứng.
+- Tiếp nối bằng 4 hồ sơ nâng cao: diễn giải nghiên cứu AI, ảnh đúng nhưng sai bối cảnh, chính sách xe miễn phí có ngoại lệ và đoạn ghi âm thiếu nguồn gốc. Có 24 lựa chọn điều tra mới, bảng dữ liệu, nguồn đối chiếu và bằng chứng mâu thuẫn.
 
-## Kết nối lại và lưu trữ
+Ba hồ sơ đầu trong mỗi chặng được xáo thứ tự và lưu cùng tiến độ; hồ sơ khủng hoảng ở vị trí 4 và 8 có giới hạn điều tra lần lượt 90 và 120 giây. Lượt chơi tiếp tục sau câu 4 và chỉ tổng kết khi hết câu 8. Thời lượng dự kiến 24–30 phút. Có thể đọc lại bằng chứng đã mở mà không mất thêm điểm, kể cả sau khi hết thời gian. Màn xem lại mở toàn bộ bằng chứng sau khi hoàn thành.
 
-Token ngẫu nhiên được lưu trong **sessionStorage riêng từng tab** để hỗ trợ reload và nhiều người thử trên một trình duyệt. Đây là lựa chọn thay cho localStorage chung giữa các tab. Giữ tab để kết nối lại; đóng hẳn tab có thể làm mất phiên tùy trình duyệt. Vai trò, token kỹ năng, thẻ và phiếu nằm trên server và được khôi phục đúng phiên.
+Mỗi hồ sơ có hình minh họa và chú thích. Ảnh sân trường do AI tạo; các đồ họa còn lại được dựng bằng SVG. Mọi nội dung đều được đánh dấu mô phỏng. Xem [ghi chú nội dung](TRUTH_RUSH_CONTENT.md) và [nguồn gốc ảnh](viral-game-client/public/images/truth-rush/README.md).
 
-Kết nối mới của cùng phiên thay kết nối cũ. Host cũng reconnect được. Mất kết nối không dừng trận và không bỏ vị trí của người chơi. Restart backend sẽ mất mọi phòng. Phòng kết thúc được dọn sau 1 giờ; lobby không hoạt động được dọn sau 2 giờ.
+## Chế độ lớp học
+
+Mở `/teacher` hoặc chọn **Tôi là giáo viên** trên trang đầu, sau đó tạo mã gồm 6 ký tự. Học sinh nhập mã này và chơi theo tốc độ riêng, không có phòng chờ.
+
+Lớp tạo mới tự động dùng bộ đầy đủ 8 hồ sơ. Backend chỉ nhận kết quả đủ 8 hồ sơ khác nhau cho lớp này. Phiên giáo viên được giữ trong `sessionStorage` để tải lại cùng tab vẫn mở được dashboard. Lượt chơi và lớp cũ gồm 4 hồ sơ vẫn được hỗ trợ để tiếp tục; tạo lượt/lớp mới để chơi đủ 8.
+
+Dashboard cập nhật:
+
+- số người tham gia và hoàn thành;
+- điểm, độ chính xác, điều tra và trách nhiệm trung bình;
+- phân bố ý kiến trước và sau điều tra;
+- bảng xếp hạng ưu tiên độ chính xác, chất lượng điều tra, trách nhiệm, độ tự tin rồi mới đến tốc độ.
+
+Điểm lớp được backend tính lại từ quyết định gốc. Server kiểm tra case, phán quyết, hành động, độ tự tin, danh sách bằng chứng và ngân sách Investigation Points; client không thể tự gửi tổng điểm.
+
+API:
+
+| Method | Endpoint | Công dụng |
+|---|---|---|
+| POST | `/api/class-sessions` | Tạo phiên đủ 8 hồ sơ và teacher token; không cần body hoặc dùng `{ "packId": "complete" }` |
+| GET | `/api/class-sessions/{code}` | Xem trạng thái công khai |
+| POST | `/api/class-sessions/{code}/join` | Tham gia lớp |
+| POST | `/api/class-sessions/{code}/results` | Nộp quyết định để server chấm |
+| GET | `/api/class-sessions/{code}/stats` | Thống kê lớp |
+| GET | `/api/class-sessions/{code}/leaderboard` | Bảng xếp hạng |
+
+`stats` và `leaderboard` yêu cầu header `X-Session-Token`. Giáo viên xem được ngay; học sinh chỉ xem được sau khi hoàn thành.
+
+## Chấm điểm
+
+Mỗi case tối đa 100 điểm:
+
+| Thành phần | Điểm |
+|---|---:|
+| Phán quyết chính xác | 40 |
+| Chất lượng bằng chứng | tối đa 25 |
+| Hành động có trách nhiệm | 20 hoặc 10 |
+| Độ tự tin đã hiệu chỉnh | -20 đến +10 |
+| Đổi từ nhận định sai sang đúng | 5 |
+
+Tổng case được chặn trong khoảng 0–100.
+
+## Build và chạy production
+
+```powershell
+npm run build
+npm start
+```
+
+Bundle được tạo tại `.artifacts/publish`. Mở [http://localhost:5001](http://localhost:5001) hoặc địa chỉ LAN của máy chủ.
+
+Dữ liệu lớp học nằm trong RAM và hết hạn sau 8 giờ. Chạy một backend instance cho bản MVP này.
 
 ## Kiểm thử
 
-~~~powershell
+```powershell
 npm test
-~~~
+```
 
-Bao gồm kiểm thử C# quy tắc kết quả/riêng tư, kiểm thử frontend và trận tích hợp **35 client SignalR thật**. Integration chạy backend riêng trên cổng 5002 với các phase ngắn để giảm thời gian kiểm thử, rồi tự dừng server đó. Cổng 5002 cần trống.
+Bộ test gồm:
 
-Bộ test kiểm tra phân vai, khóa phòng, vote trùng/sai phase, quyền host, Verify/Boost đồng thời, giới hạn token, chat/cooldown, snapshot không lộ bí mật, reconnect, reveal, thống kê và tự kết thúc.
+- quy tắc tính điểm Truth Rush và giới hạn điểm điều tra;
+- vòng đời tạo lớp, tham gia, nộp kết quả, phân quyền thống kê và leaderboard;
+- các kiểm tra frontend cho điểm, timer và nhãn;
+- kiểm tra 8 hồ sơ, ngân sách, lưu tiến độ hỏng và chuyển đổi dữ liệu lưu cũ;
+- integration HTTP thật cho bộ đầy đủ và bộ cũ, chấm điểm đồng nhất client/server, từ chối lượt thiếu/trùng hồ sơ và payload không hợp lệ.
 
-Xem TEST_REPORT.md để biết kết quả chạy thực tế và phạm vi đã kiểm chứng.
+Bộ regression SignalR của game cũ vẫn được giữ riêng và có thể chạy bằng:
 
-## Cấu trúc
+```powershell
+cd viral-game-client
+npm run test:legacy
+```
 
-~~~text
+## Cấu trúc chính
+
+```text
 ViralGame.Server/
-  Hubs/GameHub.cs                  Giao tiếp SignalR
-  Models/GameModels.cs             Mô hình và cấu hình
-  Data/ScenarioData.cs              Bộ tình huống mô phỏng
-  Services/GameService.cs           Luật và hành động người chơi
-  Services/GameStateMachine.cs      Timer, chuyển phase, hủy trận
-  Services/SnapshotService.cs       Ranh giới dữ liệu công khai/riêng tư
-  Services/VoteService.cs           Kết quả và thống kê
-  Services/RoomBroadcaster.cs       Snapshot realtime có revision
-  Services/RoomCleanupService.cs    Dọn phòng hết hạn
-ViralGame.Tests/                    Kiểm thử quy tắc và riêng tư
-viral-game-client/src/              React, giao diện responsive, phiên SignalR
-viral-game-client/tests/            Kiểm thử frontend và tích hợp 35 client
-scripts/                           Setup, chạy, build, test
-~~~
+  TruthRush/
+    TruthRushEndpoints.cs
+    TruthRushClassService.cs
+    TruthRushScoringService.cs
+    TruthRushRubrics.cs
+    TruthRushModels.cs
+viral-game-client/
+  src/truth-rush/
+    TruthRushApp.jsx
+    cases.js
+    advancedCases.js
+    PostMedia.jsx
+    gameEngine.js
+    api.js
+    theme.css
+  tests/truth-rush.test.mjs
+ViralGame.Tests/Program.cs
+```
 
-## Giao thức realtime
-
-Client gọi CreateRoom, JoinRoom, Reconnect, GetSnapshot, StartGame, SubmitInitialVote, ShareEvidence, VerifyEvidence, BoostEvidence, SendMessage, SubmitFinalVote, EndGame và LeaveRoom.
-
-Server gửi một sự kiện chuẩn hóa **Snapshot** gồm room công khai + player riêng cho đúng kết nối + isHost. Snapshot có revision và thời gian server. Dùng một sự kiện đầy đủ thay cho chuỗi event nhỏ trong requirement để reconnect khôi phục chính xác, tránh mất cập nhật. SessionReplaced thông báo khi phiên đã chuyển sang kết nối mới.
-
-Mọi thao tác thay đổi được khóa theo phòng. Không serialize trực tiếp domain model. Đáp án, thông tin kiểm chứng chưa mở, phiên và vai trò người khác không xuất hiện trong payload trước thời điểm cho phép.
+Các tình huống và nguồn trong game là dữ liệu hư cấu phục vụ học tập.

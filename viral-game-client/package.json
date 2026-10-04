@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build --configLoader runner",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/rules.test.mjs",
-    "test:integration": "node tests/integration.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:integration": "node tests/truth-rush.integration.mjs",
+    "test:legacy": "node tests/integration.mjs"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",

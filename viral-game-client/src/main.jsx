@@ -7,13 +7,19 @@ import "@fontsource/be-vietnam-pro/900.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { GameProvider } from "./GameContext";
-import App from "./App";
-import "./styles.css";
+import { TruthRushApp } from "./truth-rush/TruthRushApp";
+
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <GameProvider>
-      <App />
-    </GameProvider>
+    <TruthRushApp />
   </BrowserRouter>,
 );
+
+document.addEventListener("mousedown", (e) => {
+  const ripple = document.createElement("div");
+  ripple.className = "tr-click-ripple";
+  ripple.style.left = `${e.clientX}px`;
+  ripple.style.top = `${e.clientY}px`;
+  document.body.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+});

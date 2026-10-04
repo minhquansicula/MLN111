@@ -1,4 +1,5 @@
 using ViralGame.Server;
+using ViralGame.Server.TruthRush;
 
 var builder = WebApplication.CreateBuilder(args);
 var settings = new GameSettings();
@@ -16,6 +17,16 @@ builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSingleton<GameStateMachine>();
 builder.Services.AddSingleton<GameService>();
 builder.Services.AddHostedService<RoomCleanupService>();
+var truthRushSettings = new TruthRushSettings();
+builder.Configuration.GetSection("TruthRush").Bind(truthRushSettings);
+if (truthRushSettings.MaximumSessions < 1
+    || truthRushSettings.MaximumPlayersPerSession < 1
+    || truthRushSettings.SessionLifetimeHours < 1)
+    throw new InvalidOperationException("Invalid TruthRush configuration.");
+builder.Services.AddSingleton(truthRushSettings);
+builder.Services.AddSingleton<TruthRushStore>();
+builder.Services.AddSingleton<TruthRushScoringService>();
+builder.Services.AddSingleton<TruthRushClassService>();
 builder.Services.AddSignalR(options => {
     options.MaximumReceiveMessageSize = 16 * 1024;
     options.MaximumParallelInvocationsPerClient = 1;
@@ -36,7 +47,8 @@ app.Use(async (context, next) => {
 app.UseCors();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "VIRAL" }));
+app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "TRUTH RUSH" }));
+app.MapTruthRush();
 app.MapHub<GameHub>("/gameHub");
 app.MapFallbackToFile("index.html");
 app.Run();

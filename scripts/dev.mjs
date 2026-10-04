@@ -1,11 +1,9 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { root, client } from "./common.mjs";
-const classroom = process.argv.includes("--classroom");
 const env = {
   ...process.env,
   ASPNETCORE_ENVIRONMENT: "Development",
-  Game__MinimumPlayersToStart: classroom ? "35" : "3",
 };
 const children = [
   spawn(
@@ -14,6 +12,7 @@ const children = [
       "run",
       "--project",
       "ViralGame.Server",
+      "--no-restore",
       "--no-launch-profile",
       "--urls",
       "http://0.0.0.0:5001",
@@ -53,7 +52,5 @@ for (const child of children) {
 process.on("SIGINT", () => stop());
 process.on("SIGTERM", () => stop());
 console.log(
-  "VIRAL: http://localhost:5173 — " +
-    (classroom ? "35" : "3") +
-    " players minimum. Ctrl+C stops both servers.",
+  "TRUTH RUSH: http://localhost:5173 — teacher dashboard at /teacher. Ctrl+C stops both servers.",
 );

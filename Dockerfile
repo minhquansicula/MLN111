@@ -10,7 +10,6 @@ RUN apt-get install -y nodejs
 COPY . .
 
 # Install dependencies and build
-RUN npm install
 RUN npm run setup
 RUN npm run build
 

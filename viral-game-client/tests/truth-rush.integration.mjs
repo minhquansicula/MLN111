@@ -1,0 +1,173 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { getCase } from "../src/truth-rush/cases.js";
+import { scoreCase } from "../src/truth-rush/gameEngine.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const serverDir = resolve(here, "../../ViralGame.Server");
+const baseUrl = "http://127.0.0.1:5003";
+
+async function request(path, options = {}) {
+  const response = await fetch(baseUrl + path, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...options.headers },
+  });
+  const data = await response.json().catch(() => ({}));
+  return { response, data };
+}
+
+function caseResult(caseId, initialVerdict, finalVerdict, confidence, responsibleAction, usedInvestigations) {
+  return { caseId, initialVerdict, finalVerdict, confidence, responsibleAction, usedInvestigations };
+}
+
+const perfectCases = [
+  caseResult("case_01", "TRUE", "FALSE", 100, "REPORT", ["check_official", "check_source", "check_author"]),
+  caseResult("case_02", "TRUE", "MISLEADING", 100, "ADD_CONTEXT", ["check_statistics", "check_sample", "check_source"]),
+  caseResult("case_03", "FALSE", "TRUE", 100, "SHARE", ["view_full_context", "check_official"]),
+  caseResult("case_04", "TRUE", "NOT_ENOUGH_EVIDENCE", 100, "WAIT_FOR_MORE_EVIDENCE", ["check_source", "check_image", "check_date", "search_other_news"]),
+];
+
+test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_000 }, async () => {
+  let logs = "";
+  const server = spawn("dotnet", [
+    resolve(serverDir, "bin/Debug/net9.0/ViralGame.Server.dll"),
+    "--urls",
+    baseUrl,
+  ], {
+    cwd: serverDir,
+    windowsHide: true,
+    env: { ...process.env, ASPNETCORE_ENVIRONMENT: "Testing" },
+  });
+  server.stdout.on("data", (value) => { logs += value; });
+  server.stderr.on("data", (value) => { logs += value; });
+
+  try {
+    let healthy = false;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      try {
+        healthy = (await fetch(baseUrl + "/health")).ok;
+        if (healthy) break;
+      } catch {}
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+    }
+    assert.ok(healthy, "API did not start. " + logs.slice(-1000));
+
+    const created = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "foundation" }) });
+    assert.equal(created.response.status, 201);
+    assert.match(created.data.code, /^[A-Z2-9]{6}$/);
+
+    const joined = await request(`/api/class-sessions/${created.data.code}/join`, {
+      method: "POST",
+      body: JSON.stringify({ playerName: "Minh" }),
+    });
+    assert.equal(joined.response.status, 200);
+
+    const unfinished = await request(`/api/class-sessions/${created.data.code}/join`, {
+      method: "POST",
+      body: JSON.stringify({ playerName: "Lan" }),
+    });
+    assert.equal(unfinished.response.status, 200);
+
+    const earlyStats = await request(`/api/class-sessions/${created.data.code}/stats`, {
+      headers: { "X-Session-Token": unfinished.data.participantToken },
+    });
+    assert.equal(earlyStats.response.status, 401);
+
+    const submitted = await request(`/api/class-sessions/${created.data.code}/results`, {
+      method: "POST",
+      body: JSON.stringify({
+        participantToken: joined.data.participantToken,
+        runId: "integration-run",
+        durationSeconds: 600,
+        cases: perfectCases,
+      }),
+    });
+    assert.equal(submitted.response.status, 200);
+    assert.equal(submitted.data.score.total, 400);
+
+    const stats = await request(`/api/class-sessions/${created.data.code}/stats`, {
+      headers: { "X-Session-Token": created.data.teacherToken },
+    });
+    assert.equal(stats.response.status, 200);
+    assert.equal(stats.data.playersCompleted, 1);
+    assert.equal(stats.data.averageScore, 400);
+    assert.equal(stats.data.opinions.length, 4);
+
+    const leaders = await request(`/api/class-sessions/${created.data.code}/leaderboard`, {
+      headers: { "X-Session-Token": created.data.teacherToken },
+    });
+    assert.equal(leaders.response.status, 200);
+    assert.equal(leaders.data[0].playerName, "Minh");
+
+    const overBudget = structuredClone(perfectCases);
+    overBudget[0].usedInvestigations = ["read_original", "check_official", "check_source"];
+    const rejected = await request(`/api/class-sessions/${created.data.code}/results`, {
+      method: "POST",
+      body: JSON.stringify({
+        participantToken: unfinished.data.participantToken,
+        runId: "invalid-budget",
+        durationSeconds: 600,
+        cases: overBudget,
+      }),
+    });
+    assert.equal(rejected.response.status, 400);
+
+    const invalidPack = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "unknown" }) });
+    assert.equal(invalidPack.response.status, 400);
+    const advanced = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "advanced" }) });
+    assert.equal(advanced.response.status, 201);
+    assert.equal(advanced.data.packId, "advanced");
+    const advancedPlayer = await request(`/api/class-sessions/${advanced.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Advanced Tester" }) });
+    assert.equal(advancedPlayer.data.packId, "advanced");
+    const advancedCases = [
+      caseResult("case_05", "TRUE", "MISLEADING", 100, "ADD_CONTEXT", ["read_method", "check_statistics", "check_sample"]),
+      caseResult("case_06", "TRUE", "FALSE", 80, "ADD_CONTEXT", ["reverse_image", "compare_location"]),
+      caseResult("case_07", "FALSE", "TRUE", 90, "SHARE", ["read_policy", "check_ticket"]),
+      caseResult("case_08", "TRUE", "NOT_ENOUGH_EVIDENCE", 70, "WAIT_FOR_MORE_EVIDENCE", ["trace_recording", "check_detector", "check_official"]),
+    ];
+    const advancedPayload = { participantToken: advancedPlayer.data.participantToken, runId: "advanced-run", durationSeconds: 600, cases: [...advancedCases].reverse() };
+    const wrongPack = await request(`/api/class-sessions/${advanced.data.code}/results`, { method: "POST", body: JSON.stringify({ ...advancedPayload, cases: perfectCases }) });
+    assert.equal(wrongPack.response.status, 400);
+    for (const cases of [null, [null, null, null, null], advancedCases.map((item, index) => index === 0 ? { ...item, usedInvestigations: null } : item)]) {
+      const malformed = await request(`/api/class-sessions/${advanced.data.code}/results`, { method: "POST", body: JSON.stringify({ ...advancedPayload, cases }) });
+      assert.equal(malformed.response.status, 400);
+    }
+    const advancedResult = await request(`/api/class-sessions/${advanced.data.code}/results`, { method: "POST", body: JSON.stringify(advancedPayload) });
+    assert.equal(advancedResult.response.status, 200);
+    assert.equal(advancedResult.data.score.total, advancedCases.reduce((sum, item) => sum + scoreCase(getCase(item.caseId), item).total, 0));
+    const advancedStats = await request(`/api/class-sessions/${advanced.data.code}/stats`, { headers: { "X-Session-Token": advanced.data.teacherToken } });
+    assert.deepEqual(advancedStats.data.opinions.map((item) => item.caseId), ["case_05", "case_06", "case_07", "case_08"]);
+    assert.ok(advancedStats.data.mostUsedInvestigations.every((item) => item.name.includes(":")));
+    // Each rubric, not only its total, must agree across JavaScript and C#.
+    for (const item of advancedResult.data.cases) {
+      const submittedCase = advancedCases.find((value) => value.caseId === item.caseId);
+      assert.deepEqual(item.score, scoreCase(getCase(item.caseId), submittedCase));
+    }
+    const complete = await request("/api/class-sessions", { method: "POST" });
+    assert.equal(complete.response.status, 201);
+    assert.equal(complete.data.packId, "complete");
+    const completePlayer = await request(`/api/class-sessions/${complete.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Eight-case player" }) });
+    assert.equal(completePlayer.data.packId, "complete");
+    const allCases = [...perfectCases, ...advancedCases].map((item) => ({ ...item, confidence: 100 }));
+    const completePayload = { participantToken: completePlayer.data.participantToken, runId: "complete-run", durationSeconds: 1200, cases: [...allCases].reverse() };
+    for (const cases of [allCases.slice(0, 4), allCases.slice(0, 7), [...allCases.slice(0, 7), allCases[0]]]) {
+      const incomplete = await request(`/api/class-sessions/${complete.data.code}/results`, { method: "POST", body: JSON.stringify({ ...completePayload, cases }) });
+      assert.equal(incomplete.response.status, 400);
+    }
+    const fullResult = await request(`/api/class-sessions/${complete.data.code}/results`, { method: "POST", body: JSON.stringify(completePayload) });
+    assert.equal(fullResult.response.status, 200);
+    assert.equal(fullResult.data.cases.length, 8);
+    assert.equal(fullResult.data.score.total, 800);
+    for (const item of fullResult.data.cases) assert.deepEqual(item.score, scoreCase(getCase(item.caseId), allCases.find((value) => value.caseId === item.caseId)));
+    const fullStats = await request(`/api/class-sessions/${complete.data.code}/stats`, { headers: { "X-Session-Token": complete.data.teacherToken } });
+    assert.equal(fullStats.data.averageScore, 800);
+    assert.equal(fullStats.data.opinions.length, 8);
+    const fullBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": completePlayer.data.participantToken } });
+    assert.equal(fullBoard.data[0].totalScore, 800);
+  } finally {
+    server.kill();
+  }
+});
