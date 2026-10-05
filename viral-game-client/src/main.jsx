@@ -11,8 +11,8 @@ import { TruthRushApp } from "./truth-rush/TruthRushApp";
 import { Volume2, VolumeX } from "lucide-react";
 
 function BackgroundMusic() {
-  const [playing, setPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.5);
+  const [playing, setPlaying] = useState(true);
+  const [volume, setVolume] = useState(0.3);
   const audioRef = useRef(null);
 
   useEffect(() => {

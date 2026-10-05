@@ -14,8 +14,8 @@ export const ACTIONS = [
   { id: "WAIT_FOR_MORE_EVIDENCE", label: "Chờ thêm bằng chứng", icon: "clock", description: "Chưa lan truyền khi chưa đủ cơ sở." },
 ];
 
-const post = (author, handle, time, headline, body, likes, comments, shares, marker) => ({
-  author, handle, time, headline, body, likes, comments, shares, marker,
+const post = (author, handle, time, headline, body, likes, comments, shares, marker, media, mediaAlt, caption) => ({
+  author, handle, time, headline, body, likes, comments, shares, marker, media, mediaAlt, caption
 });
 
 export const CASES = [
@@ -24,7 +24,7 @@ export const CASES = [
     lesson: "Độ phổ biến không tạo ra độ tin cậy.", points: 3,
     correctVerdict: "FALSE", bestAction: "REPORT", reasonableActions: ["WAIT_FOR_MORE_EVIDENCE"],
     explanation: "Fanpage này mới được tạo và dùng logo gần giống trường. Trang học bổng chính thức xác nhận không có chương trình nào yêu cầu chia sẻ bài để nhận tiền.",
-    post: post("Cơ hội Sinh viên 24h", "@cohoisinhvien24h", "8 phút trước", "Chia sẻ bài viết để nhận học bổng 5.000.000đ", "Nhà trường vừa mở 200 suất hỗ trợ khẩn cấp. Chia sẻ công khai, bình luận mã sinh viên và bấm vào biểu mẫu trước 22:00 hôm nay.", "12,8K", "3,4K", "9,1K", "THÔNG BÁO GẤP"),
+    post: post("Cơ hội Sinh viên 24h", "@cohoisinhvien24h", "8 phút trước", "Chia sẻ bài viết để nhận học bổng 5.000.000đ", "Nhà trường vừa mở 200 suất hỗ trợ khẩn cấp. Chia sẻ công khai, bình luận mã sinh viên và bấm vào biểu mẫu trước 22:00 hôm nay.", "12,8K", "3,4K", "9,1K", "THÔNG BÁO GẤP", "scholarship", "Hình ảnh học bổng 5.000.000đ", "Tình huống mô phỏng để học tập - không phải thông tin thật."),
     checks: [
       { id: "check_source", label: "Kiểm tra nguồn", cost: 1, score: 10, icon: "globe", title: "Nguồn xuất bản", evidence: "Tên miền của biểu mẫu không thuộc trường. Fanpage được tạo 11 ngày trước và không có dấu xác minh.", note: "Nguồn mới và tên miền lạ là tín hiệu cần kiểm tra thêm." },
       { id: "check_official", label: "Tìm thông báo chính thức", cost: 1, score: 15, strong: true, icon: "landmark", title: "Trang học bổng của trường", evidence: "Trang chính thức ghi rõ: “Hiện không có chương trình học bổng nào yêu cầu sinh viên chia sẻ bài hoặc nhập mã sinh viên trên biểu mẫu bên ngoài.”", note: "Nguồn chính thức trực tiếp bác bỏ nội dung viral." },
@@ -53,7 +53,7 @@ export const CASES = [
     lesson: "Bối cảnh có thể xác nhận một thông tin tưởng như đáng ngờ.", points: 3,
     correctVerdict: "TRUE", bestAction: "SHARE", reasonableActions: ["ADD_CONTEXT"],
     explanation: "Ảnh bị cắt nhưng phần nội dung còn lại không làm thay đổi ý chính: giảng viên thật sự cho phép dùng AI trong bài tập số 2, với yêu cầu ghi nguồn và tự giải thích kết quả.",
-    post: post("FPT Study Hub", "@fptstudyhub", "1 giờ trước", "Giảng viên cho phép dùng AI trong bài tập số 2", "Ảnh chụp email đang lan truyền cho thấy lớp MLN111 được phép dùng công cụ AI. Một số người cho rằng ảnh đã bị cắt để xuyên tạc.", "4,9K", "1,1K", "2,3K", "ẢNH CHỤP EMAIL"),
+    post: post("FPT Study Hub", "@fptstudyhub", "1 giờ trước", "Giảng viên cho phép dùng AI trong bài tập số 2", "Ảnh chụp email đang lan truyền cho thấy lớp MLN111 được phép dùng công cụ AI. Một số người cho rằng ảnh đã bị cắt để xuyên tạc.", "4,9K", "1,1K", "2,3K", "ẢNH CHỤP EMAIL", "email", "Ảnh chụp email thông báo bị cắt bỏ", "Tình huống mô phỏng để học tập - không phải thông tin thật."),
     checks: [
       { id: "check_date", label: "Kiểm tra ngày", cost: 1, score: 15, icon: "calendar", title: "Ngày gửi email", evidence: "Email được gửi hôm qua, trước hạn bài tập 6 ngày. Mã lớp và học kỳ khớp với lịch hiện tại.", note: "Thời điểm phù hợp với thông tin trong bài đăng." },
       { id: "view_full_context", label: "Xem ảnh đầy đủ", cost: 2, score: 20, strong: true, icon: "scan", title: "Phần bị cắt", evidence: "Email đầy đủ: “Có thể dùng AI cho bài số 2, nhưng phải ghi công cụ, kiểm tra đầu ra và tự giải thích.” Phần bị cắt bổ sung điều kiện, không đảo ngược thông báo.", note: "Bối cảnh làm thông tin chính xác hơn, không biến nó thành sai." },

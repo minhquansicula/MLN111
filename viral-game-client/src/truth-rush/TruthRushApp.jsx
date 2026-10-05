@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronRight,
   CircleGauge,
   Clock3,
@@ -14,6 +16,7 @@ import {
   Flag,
   Globe2,
   GraduationCap,
+  HelpCircle,
   Image,
   Landmark,
   LockKeyhole,
@@ -30,7 +33,10 @@ import {
   Timer,
   UserRound,
   Users,
+  Volume2,
+  VolumeX,
   X,
+  XCircle,
 } from "lucide-react";
 import { ACTIONS, CASE_BANK, DEFAULT_PACK_ID, VERDICTS, actionLabel, verdictLabel, getCase, getPack } from "./cases";
 import { PostMedia } from "./PostMedia";
@@ -251,11 +257,20 @@ function DecisionLayout({ eyebrow, title, hint, children }) {
 }
 
 function VerdictChoices({ onChoose }) {
+  const verdictIcons = {
+    TRUE: <CheckCircle2 size={24} className="tr-icon-true" />,
+    FALSE: <XCircle size={24} className="tr-icon-false" />,
+    MISLEADING: <AlertTriangle size={24} className="tr-icon-misleading" />,
+    NOT_ENOUGH_EVIDENCE: <HelpCircle size={24} className="tr-icon-not-enough" />,
+  };
   return (
     <div className="tr-choice-grid">
       {VERDICTS.map((item, index) => (
         <button className="tr-choice" onClick={() => onChoose(item.id)} key={item.id}>
-          <span>0{index + 1}</span><div><b>{item.label}</b><small>{item.description}</small></div><ChevronRight size={19} />
+          <span>0{index + 1}</span>
+          <div className="tr-choice-icon-wrap">{verdictIcons[item.id]}</div>
+          <div><b>{item.label}</b><small>{item.description}</small></div>
+          <ChevronRight size={19} />
         </button>
       ))}
     </div>
@@ -266,7 +281,7 @@ function InitialScreen({ caseData, onChoose }) {
   return (
     <div className="tr-game-layout">
       <ViralPost data={caseData.post} />
-      <DecisionLayout eyebrow="PHẢN XẠ ĐẦU TIÊN" title="Bạn nghĩ bài đăng này thế nào?" hint="Chưa có bằng chứng bổ sung. Hãy ghi lại ấn tượng ban đầu.">
+      <DecisionLayout eyebrow={<>PHẢN XẠ ĐẦU TIÊN <span className="tr-eyebrow-line"></span></>} title={<>Bạn nghĩ bài đăng này <span className="tr-text-accent">thế nào?</span></>} hint="Chưa có bằng chứng bổ sung. Hãy ghi lại ấn tượng ban đầu.">
         <VerdictChoices onChoose={onChoose} />
       </DecisionLayout>
     </div>

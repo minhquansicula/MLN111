@@ -36,15 +36,7 @@ export function PostMedia({ data }) {
       graphic = imageFailed ? <div className="tr-image-error" role="status">Không tải được ảnh. {data.mediaAlt}</div> : <img src="/images/truth-rush/campus-flood.png" width="1536" height="1024" alt={data.mediaAlt} onError={() => setImageFailed(true)} decoding="async" />;
       break;
     case "scholarship":
-      graphic = <Frame label={data.mediaAlt}>
-        <circle cx="620" cy="-20" r="220" fill="#f7c94b" fillOpacity=".08" />
-        <text x="48" y="68" fill="#9eb5d5" fontSize="18" letterSpacing="3">CƠ HỘI SINH VIÊN 24H</text>
-        <text x="48" y="121" fill="#fff" fontSize="30" fontWeight="700">HỌC BỔNG HỖ TRỢ</text>
-        <text x="44" y="208" fill="#f7c94b" fontSize="78" fontWeight="800">5.000.000đ</text>
-        <text x="48" y="256" fill="#cad9ed" fontSize="22">200 SUẤT · HẠN ĐĂNG KÝ 22:00</text>
-        <rect x="48" y="288" width="442" height="54" rx="8" fill="#f7c94b" />
-        <text x="269" y="323" textAnchor="middle" fill="#172133" fontSize="20" fontWeight="700">CHIA SẺ BÀI &amp; ĐĂNG KÝ</text>
-      </Frame>;
+      graphic = imageFailed ? <div className="tr-image-error" role="status">Không tải được ảnh. {data.mediaAlt}</div> : <img src="/images/truth-rush/hoc-bong.png" width="1536" height="1024" alt={data.mediaAlt} onError={() => setImageFailed(true)} decoding="async" />;
       break;
     case "statistics":
       graphic = <Frame label={data.mediaAlt}>
@@ -59,7 +51,7 @@ export function PostMedia({ data }) {
       </Frame>;
       break;
     case "email":
-      graphic = <Frame label={data.mediaAlt}><Document email /></Frame>;
+      graphic = imageFailed ? <div className="tr-image-error" role="status">Không tải được ảnh. {data.mediaAlt}</div> : <img src="/images/truth-rush/email.png" width="1536" height="1024" alt={data.mediaAlt} onError={() => setImageFailed(true)} decoding="async" />;
       break;
     case "security":
       graphic = <Frame label={data.mediaAlt}>
