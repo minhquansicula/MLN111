@@ -173,6 +173,71 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(rankingResult.response.status, 200);
     const rankedBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": complete.data.teacherToken } });
     assert.deepEqual(rankedBoard.data.map((entry) => [entry.rank, entry.playerName]), [[1, "Eight-case player"], [2, "Ranking Tester"]]);
+
+    // Exercise all leaderboard tie-breakers with a full 35-player classroom.
+    const largeClass = await request("/api/class-sessions", { method: "POST" });
+    assert.equal(largeClass.response.status, 201);
+    const largePlayers = await Promise.all(Array.from({ length: 35 }, async (_, index) => {
+      const playerName = `Player ${String(index + 1).padStart(2, "0")}`;
+      const joinedPlayer = await request(`/api/class-sessions/${largeClass.data.code}/join`, {
+        method: "POST",
+        body: JSON.stringify({ playerName }),
+      });
+      assert.equal(joinedPlayer.response.status, 200);
+      return { ...joinedPlayer.data, playerName, index };
+    }));
+    assert.equal(new Set(largePlayers.map((player) => player.participantToken)).size, 35);
+
+    const duplicateLargePlayer = await request(`/api/class-sessions/${largeClass.data.code}/join`, {
+      method: "POST",
+      body: JSON.stringify({ playerName: "player 01" }),
+    });
+    assert.equal(duplicateLargePlayer.response.status, 400);
+
+    const largeResults = await Promise.all(largePlayers.map(async (player) => {
+      const profile = player.index % 5;
+      let cases = allCases.map((item) => ({ ...item, usedInvestigations: [...item.usedInvestigations] }));
+      if (profile === 1) cases = cases.map((item) => ({ ...item, responsibleAction: "SHARE" }));
+      if (profile === 2) cases = cases.map((item) => ({ ...item, usedInvestigations: [] }));
+      if (profile === 3) cases = cases.map((item) => ({ ...item, confidence: 50 }));
+      if (profile === 4) cases = cases.map((item) => ({ ...item, finalVerdict: "TRUE", confidence: 100, responsibleAction: "SHARE", usedInvestigations: [] }));
+      const durationSeconds = 600 + player.index;
+      const submittedLargePlayer = await request(`/api/class-sessions/${largeClass.data.code}/results`, {
+        method: "POST",
+        body: JSON.stringify({ participantToken: player.participantToken, runId: `large-run-${player.index + 1}`, durationSeconds, cases }),
+      });
+      assert.equal(submittedLargePlayer.response.status, 200);
+      return { ...submittedLargePlayer.data, durationSeconds };
+    }));
+
+    const largeStats = await request(`/api/class-sessions/${largeClass.data.code}/stats`, {
+      headers: { "X-Session-Token": largeClass.data.teacherToken },
+    });
+    assert.equal(largeStats.response.status, 200);
+    assert.equal(largeStats.data.playersJoined, 35);
+    assert.equal(largeStats.data.playersCompleted, 35);
+    assert.equal(largeStats.data.opinions.length, 8);
+    for (const opinion of largeStats.data.opinions) {
+      assert.equal(opinion.initial.reduce((sum, item) => sum + item.count, 0), 35);
+      assert.equal(opinion.final.reduce((sum, item) => sum + item.count, 0), 35);
+    }
+    const expectedAverage = Math.round((largeResults.reduce((sum, result) => sum + result.score.total, 0) / 35) * 10) / 10;
+    assert.equal(largeStats.data.averageScore, expectedAverage);
+
+    const largeBoard = await request(`/api/class-sessions/${largeClass.data.code}/leaderboard`, {
+      headers: { "X-Session-Token": largeClass.data.teacherToken },
+    });
+    assert.equal(largeBoard.response.status, 200);
+    assert.equal(largeBoard.data.length, 35);
+    assert.deepEqual(largeBoard.data.map((entry) => entry.rank), Array.from({ length: 35 }, (_, index) => index + 1));
+    const expectedLargeOrder = [...largeResults].sort((left, right) =>
+      right.score.accuracy - left.score.accuracy
+      || right.score.investigation - left.score.investigation
+      || right.score.responsibility - left.score.responsibility
+      || right.score.confidence - left.score.confidence
+      || left.durationSeconds - right.durationSeconds
+    ).map((result) => result.playerName);
+    assert.deepEqual(largeBoard.data.map((entry) => entry.playerName), expectedLargeOrder);
   } finally {
     server.kill();
   }

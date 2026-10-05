@@ -87,6 +87,27 @@ function Pill({ children, tone = "default" }) {
   return <span className={`tr-pill is-${tone}`}>{children}</span>;
 }
 
+function AnimatedNumber({ from, to, duration = 850 }) {
+  const [value, setValue] = useState(from);
+  useEffect(() => {
+    if (from === to || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setValue(to);
+      return undefined;
+    }
+    let frame;
+    const startedAt = performance.now();
+    const tick = (now) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - ((1 - progress) ** 3);
+      setValue(Math.round(from + ((to - from) * eased)));
+      if (progress < 1) frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [duration, from, to]);
+  return <span aria-hidden="true">{value}</span>;
+}
+
 function ErrorBanner({ message, onClose }) {
   if (!message) return null;
   return (
@@ -200,7 +221,7 @@ function Tutorial({ onStart, packId }) {
   );
 }
 
-function GameHeader({ caseData, caseIndex, caseCount, progress, seconds }) {
+function GameHeader({ caseData, caseIndex, caseCount, progress, seconds, currentScore }) {
   const urgent = seconds !== null && seconds <= 10;
   const warning = seconds !== null && seconds <= 30;
   return (
@@ -212,7 +233,8 @@ function GameHeader({ caseData, caseIndex, caseCount, progress, seconds }) {
           <div><i style={{ width: `${((caseIndex + 1) / caseCount) * 100}%` }} /></div>
         </div>
         <div className="tr-header-meters">
-          <Pill tone="points"><ScanSearch size={15} /> {progress.remainingPoints} điểm</Pill>
+          <Pill tone="award"><Medal size={15} /> {currentScore}/{caseCount * 100}</Pill>
+          <Pill tone="points"><ScanSearch size={15} /> {progress.remainingPoints} điểm ĐT</Pill>
           {caseData.timerSeconds && (
             <Pill tone={urgent ? "danger" : warning ? "warning" : "default"}><Timer size={15} /> {["INITIAL", "INVESTIGATION"].includes(progress.step) ? `${seconds ?? caseData.timerSeconds}s` : "Đã kết thúc điều tra"}</Pill>
           )}
@@ -402,7 +424,7 @@ function ScoreRows({ score }) {
   return <div className="tr-score-rows">{rows.map(([label, value]) => <div key={label}><span>{label}</span><b className={value < 0 ? "is-negative" : ""}>{value > 0 ? "+" : ""}{value}</b></div>)}</div>;
 }
 
-function RevealScreen({ caseData, progress, isLast, onNext }) {
+function RevealScreen({ caseData, progress, isLast, onNext, cumulativeBefore, cumulativeScore, maximumScore }) {
   const correct = progress.finalVerdict === caseData.correctVerdict;
   const missed = caseData.checks.filter((x) => x.strong && !progress.usedInvestigations.includes(x.id));
   return (
@@ -410,7 +432,11 @@ function RevealScreen({ caseData, progress, isLast, onNext }) {
       <div className={`tr-reveal-result ${correct ? "is-correct" : "is-wrong"}`}>
         <span>{correct ? <Check size={28} /> : <X size={28} />}</span>
         <div><small>PHÁN QUYẾT CỦA BẠN</small><h1>{verdictLabel(progress.finalVerdict)}</h1><b>{correct ? "CHÍNH XÁC" : `ĐÁP ÁN: ${verdictLabel(caseData.correctVerdict)}`}</b></div>
-        <strong>+{progress.score.total}</strong>
+        <div className="tr-running-score">
+          <small>TỔNG ĐIỂM</small>
+          <strong aria-label={`Tổng điểm ${cumulativeScore} trên ${maximumScore}`}><AnimatedNumber from={cumulativeBefore} to={cumulativeScore} /><em>/{maximumScore}</em></strong>
+          <span>+{progress.score.total} hồ sơ này</span>
+        </div>
       </div>
       <div className="tr-reveal-grid">
         <article className="tr-explanation-card">
@@ -750,11 +776,13 @@ export function TruthRushApp() {
   if (progress.step === "FINAL") content = <FinalVerdictScreen progress={progress} onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.finalVerdict = value; item.step = "CONFIDENCE"; })} />;
   if (progress.step === "CONFIDENCE") content = <ConfidenceScreen onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.confidence = value; item.step = "ACTION"; })} />;
   if (progress.step === "ACTION") content = <ActionScreen onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.responsibleAction = value; item.score = scoreCase(caseData, item); item.step = "REVEAL"; })} />;
-  if (progress.step === "REVEAL") content = <RevealScreen caseData={caseData} progress={progress} isLast={run.caseIndex === run.cases.length - 1} onNext={() => commit((next) => { if (next.caseIndex === next.cases.length - 1) next.status = "RESULT"; else next.caseIndex += 1; })} />;
+  const currentScore = totalScore(run);
+  const cumulativeBefore = run.cases.slice(0, run.caseIndex).reduce((sum, item) => sum + (item.score?.total ?? 0), 0);
+  if (progress.step === "REVEAL") content = <RevealScreen caseData={caseData} progress={progress} isLast={run.caseIndex === run.cases.length - 1} cumulativeBefore={cumulativeBefore} cumulativeScore={currentScore} maximumScore={run.cases.length * 100} onNext={() => commit((next) => { if (next.caseIndex === next.cases.length - 1) next.status = "RESULT"; else next.caseIndex += 1; })} />;
 
   const gameMain = (
     <>
-      <GameHeader caseData={caseData} caseIndex={run.caseIndex} caseCount={run.cases.length} progress={progress} seconds={seconds} />
+      <GameHeader caseData={caseData} caseIndex={run.caseIndex} caseCount={run.cases.length} progress={progress} seconds={seconds} currentScore={currentScore} />
       <main className="tr-game-main"><ErrorBanner message={storageError} />{["FINAL", "CONFIDENCE", "ACTION"].includes(progress.step) && <EvidenceNotebook caseData={caseData} progress={progress} onOpen={setEvidence} />}{content}</main>
       <EvidenceSheet check={evidence && progress.usedInvestigations.includes(evidence.id) ? evidence : null} onClose={() => setEvidence(null)} />
     </>

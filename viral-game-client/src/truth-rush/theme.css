@@ -390,7 +390,11 @@ button { color: inherit; }
 .tr-reveal-result h1 { margin: 2px 0; font-size: 1.55rem; }
 .tr-reveal-result > div > b { color: var(--tr-success); font-size: .72rem; letter-spacing: .08em; }
 .tr-reveal-result.is-wrong > div > b { color: var(--tr-danger); }
-.tr-reveal-result > strong { color: var(--tr-accent); font-size: 2.4rem; }
+.tr-running-score { min-width: 150px; text-align: right; }
+.tr-running-score > small, .tr-running-score > span { display: block; }
+.tr-running-score > strong { display: flex; align-items: baseline; justify-content: flex-end; color: var(--tr-accent); font-size: 2.4rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.tr-running-score > strong em { margin-left: 3px; color: var(--tr-text-secondary); font-size: .8rem; font-style: normal; }
+.tr-running-score > span { margin-top: 5px; color: var(--tr-success); font-size: .72rem; font-weight: 800; }
 .tr-reveal-grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 14px; margin-bottom: 18px; }
 .tr-explanation-card, .tr-score-card { padding: 24px; border: 1px solid var(--tr-border); border-radius: 14px; background: #101a2a; }
 .tr-explanation-card h2 { margin: 16px 0 9px; font-size: 1.45rem; }
@@ -516,7 +520,8 @@ button { color: inherit; }
   .tr-action-grid { grid-template-columns: 1fr; }
   .tr-confidence { grid-template-columns: repeat(2, 1fr); }
   .tr-reveal-result { grid-template-columns: auto 1fr; padding: 17px; }
-  .tr-reveal-result > strong { grid-column: 2; font-size: 2rem; }
+  .tr-running-score { grid-column: 2; text-align: left; }
+  .tr-running-score > strong { justify-content: flex-start; font-size: 2rem; }
   .tr-reveal-grid { gap: 10px; }
   .tr-explanation-card, .tr-score-card { padding: 18px; }
   .tr-result-grid { grid-template-columns: repeat(2, 1fr); }
@@ -582,6 +587,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px 
 @media (max-width: 560px) {
   .tr-game-header-inner { gap: 10px; }
   .tr-header-progress { font-size: .58rem; letter-spacing: .07em; }
+  .tr-header-meters { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; }
   .tr-evidence-sheet { padding-right: 17px; padding-left: 17px; }
   .tr-notebook button > span { font-size: .82rem; }
 }
