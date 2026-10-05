@@ -511,12 +511,25 @@ function ClassResults({ run, onBack }) {
   const [reloadIndex, setReloadIndex] = useState(0);
   useEffect(() => {
     let active = true;
-    setError("");
-    Promise.all([
-      classApi.stats(run.player.classCode, run.player.participantToken),
-      classApi.leaderboard(run.player.classCode, run.player.participantToken),
-    ]).then(([stats, board]) => { if (active) { setData(stats); setLeaders(board); } }).catch((err) => { if (active) setError(err.message); });
-    return () => { active = false; };
+    let inFlight = false;
+    async function refresh() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [stats, board] = await Promise.all([
+          classApi.stats(run.player.classCode, run.player.participantToken),
+          classApi.leaderboard(run.player.classCode, run.player.participantToken),
+        ]);
+        if (active) { setData(stats); setLeaders(board); setError(""); }
+      } catch (err) {
+        if (active && !data) setError(err.message);
+      } finally {
+        inFlight = false;
+      }
+    }
+    refresh();
+    const id = window.setInterval(refresh, 3000);
+    return () => { active = false; window.clearInterval(id); };
   }, [run, reloadIndex]);
   return (
     <main className="tr-page">
@@ -525,12 +538,12 @@ function ClassResults({ run, onBack }) {
       <ErrorBanner message={error} />
       {error && <Button variant="secondary" onClick={() => setReloadIndex((index) => index + 1)}>THỬ TẢI LẠI</Button>}
       {!data && !error && <div className="tr-loading"><span className="tr-spinner" /> Đang tổng hợp kết quả…</div>}
-      {data && <ClassDashboard data={data} leaders={leaders} />}
+      {data && <ClassDashboard data={data} leaders={leaders} hideLeaderboard={true} />}
     </main>
   );
 }
 
-function ClassDashboard({ data, leaders }) {
+function ClassDashboard({ data, leaders, hideLeaderboard }) {
   const checkLabel = (id) => {
     const [caseId, checkId] = id.split(":");
     if (checkId) return `${getCase(caseId)?.title}: ${getCase(caseId)?.checks.find((item) => item.id === checkId)?.label ?? checkId}`;
@@ -545,13 +558,21 @@ function ClassDashboard({ data, leaders }) {
         <div><span>Điều tra TB</span><b>{Math.round(data.averageInvestigation)}</b></div>
         <div><span>Trách nhiệm TB</span><b>{Math.round(data.averageResponsibility)}</b></div>
       </section>
-      {data.opinions?.map((opinion, index) => <section className="tr-opinion-card" key={opinion.caseId}><div className="tr-section-title"><BrainCircuit size={21} /><div><small>HỒ SƠ {index + 1}</small><h2>{getCase(opinion.caseId)?.title ?? "Ý kiến thay đổi sau điều tra"}</h2></div></div><div className="tr-distribution-grid"><Distribution title="TRƯỚC ĐIỀU TRA" values={opinion.initial} /><Distribution title="SAU ĐIỀU TRA" values={opinion.final} /></div></section>)}
-      <section className="tr-insight-grid">
-        <article><h3>Kiểm tra được dùng nhiều</h3>{data.mostUsedInvestigations?.length ? data.mostUsedInvestigations.map((item) => <div key={item.name}><span>{checkLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Chưa có dữ liệu.</p>}</article>
-        <article><h3>Bằng chứng mạnh bị bỏ lỡ</h3>{data.mostMissedStrongEvidence?.length ? data.mostMissedStrongEvidence.map((item) => <div key={item.name}><span>{checkLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Không có.</p>}</article>
-        <article><h3>Hành động sau phán quyết</h3>{data.responsibleActions?.length ? data.responsibleActions.map((item) => <div key={item.name}><span>{actionLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Chưa có dữ liệu.</p>}</article>
-      </section>
-      <section className="tr-leaderboard"><div className="tr-section-title"><Medal size={21} /><h2>Điểm nổi bật</h2></div>{leaders.length === 0 ? <p>Chưa có kết quả.</p> : leaders.slice(0, 10).map((item, index) => <div key={item.playerName}><span className="tr-rank">{index + 1}</span><b>{item.playerName}</b><span>{item.totalScore} điểm</span></div>)}</section>
+      <div className={hideLeaderboard ? "" : "tr-dashboard-layout"}>
+        {!hideLeaderboard && (
+          <aside className="tr-dashboard-sidebar">
+            <section className="tr-leaderboard"><div className="tr-section-title"><Medal size={21} /><h2>Điểm nổi bật</h2></div>{leaders.length === 0 ? <p>Chưa có kết quả.</p> : leaders.slice(0, 10).map((item, index) => <div key={item.playerName}><span className="tr-rank">{index + 1}</span><b>{item.playerName}</b><span>{item.totalScore} điểm</span></div>)}</section>
+          </aside>
+        )}
+        <div className="tr-dashboard-main">
+          {data.opinions?.map((opinion, index) => <section className="tr-opinion-card" key={opinion.caseId}><div className="tr-section-title"><BrainCircuit size={21} /><div><small>HỒ SƠ {index + 1}</small><h2>{getCase(opinion.caseId)?.title ?? "Ý kiến thay đổi sau điều tra"}</h2></div></div><div className="tr-distribution-grid"><Distribution title="TRƯỚC ĐIỀU TRA" values={opinion.initial} /><Distribution title="SAU ĐIỀU TRA" values={opinion.final} /></div></section>)}
+          <section className="tr-insight-grid">
+            <article><h3>Kiểm tra được dùng nhiều</h3>{data.mostUsedInvestigations?.length ? data.mostUsedInvestigations.map((item) => <div key={item.name}><span>{checkLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Chưa có dữ liệu.</p>}</article>
+            <article><h3>Bằng chứng mạnh bị bỏ lỡ</h3>{data.mostMissedStrongEvidence?.length ? data.mostMissedStrongEvidence.map((item) => <div key={item.name}><span>{checkLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Không có.</p>}</article>
+            <article><h3>Hành động sau phán quyết</h3>{data.responsibleActions?.length ? data.responsibleActions.map((item) => <div key={item.name}><span>{actionLabel(item.name)}</span><b>{item.count}</b></div>) : <p>Chưa có dữ liệu.</p>}</article>
+          </section>
+        </div>
+      </div>
     </>
   );
 }
@@ -731,11 +752,17 @@ export function TruthRushApp() {
   if (progress.step === "ACTION") content = <ActionScreen onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.responsibleAction = value; item.score = scoreCase(caseData, item); item.step = "REVEAL"; })} />;
   if (progress.step === "REVEAL") content = <RevealScreen caseData={caseData} progress={progress} isLast={run.caseIndex === run.cases.length - 1} onNext={() => commit((next) => { if (next.caseIndex === next.cases.length - 1) next.status = "RESULT"; else next.caseIndex += 1; })} />;
 
-  return (
-    <div className="truth-rush-root">
+  const gameMain = (
+    <>
       <GameHeader caseData={caseData} caseIndex={run.caseIndex} caseCount={run.cases.length} progress={progress} seconds={seconds} />
       <main className="tr-game-main"><ErrorBanner message={storageError} />{["FINAL", "CONFIDENCE", "ACTION"].includes(progress.step) && <EvidenceNotebook caseData={caseData} progress={progress} onOpen={setEvidence} />}{content}</main>
       <EvidenceSheet check={evidence && progress.usedInvestigations.includes(evidence.id) ? evidence : null} onClose={() => setEvidence(null)} />
+    </>
+  );
+
+  return (
+    <div className="truth-rush-root">
+      {gameMain}
     </div>
   );
 }

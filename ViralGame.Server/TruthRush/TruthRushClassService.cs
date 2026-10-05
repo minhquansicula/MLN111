@@ -43,7 +43,7 @@ public sealed class TruthRushClassService(TruthRushStore store, TruthRushSetting
         var participant = session.Participants.Values.FirstOrDefault(item => FixedEquals(item.Token, request.ParticipantToken))
             ?? throw new UnauthorizedAccessException("Phiên người chơi không hợp lệ.");
         var result = scoring.Score(participant.Id, participant.Name, request);
-        if (!TruthRushRubrics.Packs[session.PackId].ToHashSet(StringComparer.Ordinal).SetEquals(result.Cases.Select(item => item.CaseId)))
+        if (!result.Cases.Select(item => item.CaseId).ToHashSet(StringComparer.Ordinal).SetEquals(TruthRushRubrics.Packs[session.PackId]))
             throw new TruthRushValidationException("Kết quả không thuộc bộ hồ sơ của lớp.");
         var key = $"{participant.Id}:{result.RunId}";
         lock (session.Gate)

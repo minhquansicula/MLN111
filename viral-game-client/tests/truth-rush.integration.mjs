@@ -153,7 +153,7 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(completePlayer.data.packId, "complete");
     const allCases = [...perfectCases, ...advancedCases].map((item) => ({ ...item, confidence: 100 }));
     const completePayload = { participantToken: completePlayer.data.participantToken, runId: "complete-run", durationSeconds: 1200, cases: [...allCases].reverse() };
-    for (const cases of [allCases.slice(0, 4), allCases.slice(0, 7), [...allCases.slice(0, 7), allCases[0]]]) {
+    for (const cases of [[], allCases.slice(0, 4), allCases.slice(0, 7), [...allCases.slice(0, 7), allCases[0]]]) {
       const incomplete = await request(`/api/class-sessions/${complete.data.code}/results`, { method: "POST", body: JSON.stringify({ ...completePayload, cases }) });
       assert.equal(incomplete.response.status, 400);
     }
@@ -167,6 +167,12 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(fullStats.data.opinions.length, 8);
     const fullBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": completePlayer.data.participantToken } });
     assert.equal(fullBoard.data[0].totalScore, 800);
+    const rankingPlayer = await request(`/api/class-sessions/${complete.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Ranking Tester" }) });
+    const lowScoreCases = allCases.map((item) => ({ ...item, finalVerdict: "TRUE", confidence: 100, responsibleAction: "SHARE", usedInvestigations: [] }));
+    const rankingResult = await request(`/api/class-sessions/${complete.data.code}/results`, { method: "POST", body: JSON.stringify({ participantToken: rankingPlayer.data.participantToken, runId: "ranking-run", durationSeconds: 1300, cases: lowScoreCases }) });
+    assert.equal(rankingResult.response.status, 200);
+    const rankedBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": complete.data.teacherToken } });
+    assert.deepEqual(rankedBoard.data.map((entry) => [entry.rank, entry.playerName]), [[1, "Eight-case player"], [2, "Ranking Tester"]]);
   } finally {
     server.kill();
   }

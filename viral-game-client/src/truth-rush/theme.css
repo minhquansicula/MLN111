@@ -642,3 +642,31 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px 
   accent-color: var(--tr-accent);
   cursor: pointer;
 }
+
+.tr-dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.35fr) 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.tr-dashboard-sidebar {
+  position: sticky;
+  top: 30px;
+}
+
+.tr-dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .tr-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+  .tr-dashboard-sidebar {
+    position: static;
+  }
+}
+

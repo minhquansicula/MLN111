@@ -84,6 +84,10 @@ catch (TruthRushValidationException)
     budgetRejected = true;
 }
 Check(budgetRejected, "Truth Rush server rejects investigation points over budget");
+var incompleteRejected = false;
+try { truthScoring.Score("participant", "Lan", new SubmitRunRequest("token", "partial-run", 600, [])); }
+catch (TruthRushValidationException) { incompleteRejected = true; }
+Check(incompleteRejected, "Truth Rush server rejects an empty or incomplete classroom run");
 var classService = new TruthRushClassService(
     new TruthRushStore(),
     new TruthRushSettings { MaximumSessions = 2, MaximumPlayersPerSession = 3, SessionLifetimeHours = 1 },
