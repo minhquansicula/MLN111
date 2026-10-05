@@ -596,3 +596,42 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px 
   0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.8; border-width: 3px; }
   100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; border-width: 1px; }
 }
+
+/* Background Music Player */
+.tr-music-player {
+  position: fixed;
+  bottom: var(--tr-space-md);
+  right: var(--tr-space-md);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-sm);
+  background-color: var(--tr-bg-surface);
+  border: 1px solid var(--tr-border);
+  padding: 6px 12px;
+  border-radius: var(--tr-radius-full);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.tr-music-toggle {
+  background: none;
+  border: none;
+  color: var(--tr-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: color var(--tr-transition);
+}
+
+.tr-music-toggle:hover {
+  color: var(--tr-accent);
+}
+
+.tr-volume-slider {
+  width: 80px;
+  accent-color: var(--tr-accent);
+  cursor: pointer;
+}
