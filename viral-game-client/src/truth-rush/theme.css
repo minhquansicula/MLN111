@@ -476,9 +476,13 @@ button { color: inherit; }
 .tr-distribution i { height: 7px; border-radius: 7px; background: #263349; overflow: hidden; }
 .tr-distribution i b { display: block; height: 100%; min-width: 1px; background: var(--tr-blue); }
 .tr-distribution em { color: var(--tr-text-secondary); font-style: normal; text-align: right; }
-.tr-leaderboard > div:not(.tr-section-title) { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; padding: 10px 0; border-top: 1px solid #243147; font-size: .82rem; }
 .tr-leaderboard > p { color: var(--tr-text-secondary); }
-.tr-leaderboard > div > span:last-child { color: var(--tr-text-secondary); }
+.tr-ranking-hint { margin-bottom: 14px; font-size: .74rem; line-height: 1.6; }
+.tr-ranking-list { max-height: 560px; overflow-y: auto; }
+.tr-ranking-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 12px 0; border-top: 1px solid #243147; font-size: .82rem; }
+.tr-ranking-row b { overflow-wrap: anywhere; }
+.tr-ranking-row small { display: block; margin-top: 5px; color: var(--tr-text-secondary); font-size: .68rem; }
+.tr-ranking-row > span:last-child { color: var(--tr-accent); white-space: nowrap; }
 .tr-rank { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; color: #121610; background: var(--tr-accent); font-size: .7rem; font-weight: 900; }
 .tr-insight-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
 .tr-insight-grid article { padding: 18px; border: 1px solid var(--tr-border); border-radius: 11px; background: #101a2a; }

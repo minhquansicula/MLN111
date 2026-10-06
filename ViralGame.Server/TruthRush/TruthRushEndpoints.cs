@@ -9,6 +9,7 @@ public static class TruthRushEndpoints
         group.MapGet("/{code}", (string code, TruthRushClassService service) => Execute(() => Results.Ok(service.SessionInfo(code))));
         group.MapPost("/{code}/join", (string code, JoinClassRequest request, TruthRushClassService service) => Execute(() => Results.Ok(service.Join(code, request))));
         group.MapPost("/{code}/results", (string code, SubmitRunRequest request, TruthRushClassService service) => Execute(() => Results.Ok(service.Submit(code, request))));
+        group.MapPut("/{code}/progress", (string code, SubmitRunRequest request, TruthRushClassService service) => Execute(() => Results.Ok(service.UpdateProgress(code, request))));
         group.MapGet("/{code}/stats", (string code, HttpRequest request, TruthRushClassService service) => Execute(() => Results.Ok(service.Stats(code, request.Headers["X-Session-Token"].FirstOrDefault()))));
         group.MapGet("/{code}/leaderboard", (string code, HttpRequest request, TruthRushClassService service) => Execute(() => Results.Ok(service.Leaderboard(code, request.Headers["X-Session-Token"].FirstOrDefault()))));
         return endpoints;

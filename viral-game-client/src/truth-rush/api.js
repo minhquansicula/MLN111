@@ -16,6 +16,7 @@ export const classApi = {
   info: (code) => request(`/api/class-sessions/${encodeURIComponent(code)}`),
   join: (code, playerName) => request(`/api/class-sessions/${encodeURIComponent(code)}/join`, { method: "POST", body: JSON.stringify({ playerName }) }),
   submit: (code, payload) => request(`/api/class-sessions/${encodeURIComponent(code)}/results`, { method: "POST", body: JSON.stringify(payload) }),
+  progress: (code, payload, signal) => request(`/api/class-sessions/${encodeURIComponent(code)}/progress`, { method: "PUT", body: JSON.stringify(payload), signal }),
   stats: (code, token) => request(`/api/class-sessions/${encodeURIComponent(code)}/stats`, { headers: { "X-Session-Token": token } }),
   leaderboard: (code, token) => request(`/api/class-sessions/${encodeURIComponent(code)}/leaderboard`, { headers: { "X-Session-Token": token } }),
 };

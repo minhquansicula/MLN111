@@ -1,7 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CASES, CASE_BANK, CASE_PACKS, getCase } from "../src/truth-rush/cases.js";
-import { createRun, purchaseInvestigation, validateRun, scoreCase, scoreTotals, totalScore } from "../src/truth-rush/gameEngine.js";
+import { createRun, purchaseInvestigation, validateRun, scoreCase, scoreTotals, totalScore, submissionPayload } from "../src/truth-rush/gameEngine.js";
+
+test("live payload includes only confirmed cases, including zero scores, after resume", () => {
+  const run = createRun({ name: "Live", classCode: "ABCDEF", participantToken: "A".repeat(64) });
+  run.status = "PLAYING";
+  run.caseIndex = 1;
+  const item = run.cases[0];
+  Object.assign(item, { step: "REVEAL", initialVerdict: "TRUE", finalVerdict: getCase(item.caseId).correctVerdict === "TRUE" ? "FALSE" : "TRUE", confidence: 100, responsibleAction: "SHARE" });
+  // Valid timed deadlines are retained if the shuffled case requires one.
+  item.investigationDeadline = Date.now() + 90_000;
+  const restored = validateRun(JSON.parse(JSON.stringify(run)));
+  assert.ok(restored);
+  assert.equal(restored.cases[0].score.total, 0);
+  const payload = submissionPayload(restored, true);
+  assert.equal(payload.runId, run.runId);
+  assert.equal(payload.cases.length, 1);
+  assert.equal(payload.cases[0].caseId, item.caseId);
+  assert.ok(!("score" in payload.cases[0]), "Server must compute points itself");
+  assert.equal(submissionPayload(restored).cases.length, 8);
+  assert.equal(submissionPayload(createRun({ name: "Solo" }), true).cases.length, 0);
+});
 
 function progress(caseData, overrides = {}) {
   return {

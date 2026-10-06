@@ -5,14 +5,14 @@ public sealed class TruthRushScoringService
     private static readonly IReadOnlyDictionary<int, int> CorrectConfidence = new Dictionary<int, int> { [50] = 0, [60] = 2, [70] = 4, [80] = 6, [90] = 8, [100] = 10 };
     private static readonly IReadOnlyDictionary<int, int> WrongConfidence = new Dictionary<int, int> { [50] = -3, [60] = -5, [70] = -7, [80] = -10, [90] = -15, [100] = -20 };
 
-    public ScoredRun Score(string participantId, string playerName, SubmitRunRequest request)
+    public ScoredRun Score(string participantId, string playerName, SubmitRunRequest request, bool allowPartial = false)
     {
         if (string.IsNullOrWhiteSpace(request.RunId) || request.RunId.Length > 80) throw new TruthRushValidationException("Run ID không hợp lệ.");
         if (request.DurationSeconds is < 1 or > 7200) throw new TruthRushValidationException("Thời gian chơi không hợp lệ.");
         if (request.Cases is null || request.Cases.Count == 0 || request.Cases.Any(item => item is null)
             || request.Cases.Select(item => item.CaseId).Distinct(StringComparer.Ordinal).Count() != request.Cases.Count)
             throw new TruthRushValidationException("Kết quả phải có đủ các hồ sơ khác nhau trong bộ.");
-        if (!TruthRushRubrics.Packs.Values.Any(ids => ids.ToHashSet(StringComparer.Ordinal).SetEquals(request.Cases.Select(item => item.CaseId))))
+        if (!allowPartial && !TruthRushRubrics.Packs.Values.Any(ids => ids.ToHashSet(StringComparer.Ordinal).SetEquals(request.Cases.Select(item => item.CaseId))))
             throw new TruthRushValidationException("Kết quả phải có đủ các hồ sơ thuộc cùng một bộ.");
         var scoredCases = request.Cases.Select(ScoreCase).OrderBy(item => item.CaseId).ToArray();
         var total = new ScoreBreakdown(scoredCases.Sum(item => item.Score.Accuracy), scoredCases.Sum(item => item.Score.Investigation), scoredCases.Sum(item => item.Score.Responsibility), scoredCases.Sum(item => item.Score.Confidence), scoredCases.Sum(item => item.Score.Adaptability), scoredCases.Sum(item => item.Score.Total));

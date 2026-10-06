@@ -30,7 +30,7 @@ const perfectCases = [
   caseResult("case_04", "TRUE", "NOT_ENOUGH_EVIDENCE", 100, "WAIT_FOR_MORE_EVIDENCE", ["check_source", "check_image", "check_date", "search_other_news"]),
 ];
 
-test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_000 }, async () => {
+test("classroom HTTP API completes a secure scoring round trip", { timeout: 45_000 }, async () => {
   let logs = "";
   const server = spawn("dotnet", [
     resolve(serverDir, "bin/Debug/net9.0/ViralGame.Server.dll"),
@@ -216,6 +216,7 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(fullStats.data.opinions.length, 8);
     const fullBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": completePlayer.data.participantToken } });
     assert.equal(fullBoard.data[0].totalScore, 800);
+    await verifyLiveLeaderboard(allCases);
     const rankingPlayer = await request(`/api/class-sessions/${complete.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Ranking Tester" }) });
     const lowScoreCases = allCases.map((item) => ({ ...item, finalVerdict: "TRUE", confidence: 100, responsibleAction: "SHARE", usedInvestigations: [] }));
     const rankingResult = await request(`/api/class-sessions/${complete.data.code}/results`, { method: "POST", body: JSON.stringify({ participantToken: rankingPlayer.data.participantToken, runId: "ranking-run", durationSeconds: 1300, cases: lowScoreCases }) });
@@ -389,3 +390,100 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     server.kill();
   }
 });
+
+async function verifyLiveLeaderboard(allCases) {
+  const created = await request("/api/class-sessions", { method: "POST" });
+  assert.equal(created.response.status, 201);
+  const path = `/api/class-sessions/${created.data.code}`;
+  const headers = { "X-Session-Token": created.data.teacherToken };
+  const players = await Promise.all(Array.from({ length: 35 }, async (_, index) => {
+    const joined = await request(`${path}/join`, { method: "POST", body: JSON.stringify({ playerName: `Live ${String(index).padStart(2, "0")}` }) });
+    assert.equal(joined.response.status, 200);
+    const cases = allCases.map((item) => index === 0
+      ? { ...item, finalVerdict: getCase(item.caseId).correctVerdict === "TRUE" ? "FALSE" : "TRUE", confidence: 100, responsibleAction: "SHARE", usedInvestigations: [] }
+      : { ...item, confidence: 50 + (index % 6) * 10 });
+    return { ...joined.data, runId: `live-${index}`, durationSeconds: 500 + index, cases };
+  }));
+  const payload = (player, count) => ({ participantToken: player.participantToken, runId: player.runId, durationSeconds: player.durationSeconds, cases: player.cases.slice(0, count) });
+  const put = (body) => request(`${path}/progress`, { method: "PUT", body: JSON.stringify(body) });
+  assert.deepEqual((await request(`${path}/leaderboard`, { headers })).data, []);
+  assert.equal((await put({ ...payload(players[0], 1), participantToken: "bad" })).response.status, 401);
+  for (const cases of [[], null, [null], [{ ...allCases[0], confidence: 55 }], [allCases[0], allCases[0]], [{ ...allCases[0], caseId: "unknown" }], [{ ...allCases[0], usedInvestigations: ["read_original", "check_official", "check_source"] }]]) {
+    assert.equal((await put({ ...payload(players[0], 1), cases })).response.status, 400);
+  }
+  // Shuffled snapshots arrive out of order; only the longest matching snapshot survives.
+  const snapshots = await Promise.all([3, 1, 2, 3].map((count) => put(payload(players[1], count))));
+  snapshots.forEach((item) => assert.equal(item.response.status, 200));
+  let board = (await request(`${path}/leaderboard`, { headers })).data;
+  assert.equal(board[0].casesCompleted, 3);
+  const changed = payload(players[1], 3);
+  changed.cases = changed.cases.map((item, index) => index === 0 ? { ...item, confidence: 100 } : item);
+  assert.equal((await put(changed)).response.status, 400);
+  assert.equal((await put({ ...payload(players[1], 3), runId: "another-run" })).response.status, 400);
+  // Snapshot retries and reopening an already purchased check do not add points.
+  const repeats = await Promise.all(Array.from({ length: 10 }, () => put(payload(players[1], 3))));
+  repeats.forEach((item) => assert.equal(item.response.status, 200));
+  const reordered = payload(players[1], 3);
+  reordered.cases = [...reordered.cases].reverse().map((item) => ({ ...item, usedInvestigations: [...item.usedInvestigations].reverse() }));
+  assert.equal((await put(reordered)).response.status, 200);
+  for (let count = 1; count <= 8; count++) {
+    const updates = await Promise.all(players.map((player) => put(payload(player, count))));
+    updates.forEach((item) => assert.equal(item.response.status, 200));
+    board = (await request(`${path}/leaderboard`, { headers })).data;
+    assert.equal(board.length, 35);
+    assert.equal(new Set(board.map((entry) => entry.playerName)).size, 35);
+    assert.deepEqual(board.map((entry) => entry.rank), Array.from({ length: 35 }, (_, index) => index + 1));
+    const expected = players.map((player) => {
+      const completed = player === players[1] ? Math.max(3, count) : count;
+      const scores = player.cases.slice(0, completed).map((item) => scoreCase(getCase(item.caseId), item));
+      return { playerName: player.playerName, durationSeconds: player.durationSeconds, completed,
+        ...Object.fromEntries(["accuracy", "investigation", "responsibility", "confidence", "total"].map((key) => [key, scores.reduce((sum, score) => sum + score[key], 0)])) };
+    }).sort((a, b) => b.accuracy - a.accuracy || b.investigation - a.investigation || b.responsibility - a.responsibility || b.confidence - a.confidence || a.durationSeconds - b.durationSeconds);
+    assert.deepEqual(board.map((entry) => entry.playerName), expected.map((entry) => entry.playerName));
+    for (const entry of board) {
+      const score = expected.find((item) => item.playerName === entry.playerName);
+      assert.equal(entry.totalScore, score.total);
+      assert.equal(entry.casesCompleted, score.completed);
+      assert.equal(entry.totalCases, 8);
+      assert.equal(entry.isCompleted, false);
+    }
+    assert.equal(board.find((entry) => entry.playerName === players[0].playerName).totalScore, 0);
+    const stats = (await request(`${path}/stats`, { headers })).data;
+    assert.equal(stats.playersCompleted, 0);
+    assert.equal(stats.averageScore, 0);
+    assert.equal(stats.opinions[0].initial.reduce((sum, item) => sum + item.count, 0), 0);
+  }
+  assert.equal((await request(`${path}/leaderboard`, { headers: { "X-Session-Token": players[0].participantToken } })).response.status, 401);
+  const changedFinal = payload(players[1], 8);
+  changedFinal.cases = changedFinal.cases.map((item, index) => index === 0 ? { ...item, confidence: 100 } : item);
+  for (const body of [changedFinal, { ...payload(players[1], 8), runId: "replacement-run" }]) {
+    assert.equal((await request(`${path}/results`, { method: "POST", body: JSON.stringify(body) })).response.status, 400);
+  }
+  const finalized = await Promise.all(players.map(async (player) => {
+    const results = await Promise.all([
+      request(`${path}/results`, { method: "POST", body: JSON.stringify(payload(player, 8)) }),
+      put(payload(player, 7)), put(payload(player, 8)),
+    ]);
+    results.forEach((item) => assert.equal(item.response.status, 200));
+    return results[0].data;
+  }));
+  board = (await request(`${path}/leaderboard`, { headers })).data;
+  assert.equal(board.length, 35);
+  assert.ok(board.every((entry) => entry.isCompleted && entry.casesCompleted === 8));
+  assert.equal((await request(`${path}/stats`, { headers })).data.playersCompleted, 35);
+  const delayed = await put(payload(players[1], 1));
+  assert.deepEqual(delayed.data, finalized[1]);
+  assert.deepEqual((await request(`${path}/leaderboard`, { headers })).data, board);
+  assert.equal((await put(changed)).response.status, 400);
+  const conflictingFinal = { ...payload(players[1], 8), runId: "different-final" };
+  assert.equal((await put(conflictingFinal)).response.status, 400);
+  // Partial progress must also stay within the selected class pack.
+  const oldPack = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "foundation" }) });
+  const oldPlayer = await request(`/api/class-sessions/${oldPack.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Legacy Live" }) });
+  const oldPayload = { participantToken: oldPlayer.data.participantToken, runId: "legacy-live", durationSeconds: 10, cases: [allCases[4]] };
+  assert.equal((await request(`/api/class-sessions/${oldPack.data.code}/progress`, { method: "PUT", body: JSON.stringify(oldPayload) })).response.status, 400);
+  oldPayload.cases = [allCases[0]];
+  assert.equal((await request(`/api/class-sessions/${oldPack.data.code}/progress`, { method: "PUT", body: JSON.stringify(oldPayload) })).response.status, 200);
+  const oldBoard = await request(`/api/class-sessions/${oldPack.data.code}/leaderboard`, { headers: { "X-Session-Token": oldPack.data.teacherToken } });
+  assert.equal(oldBoard.data[0].totalCases, 4);
+}

@@ -17,6 +17,7 @@ public sealed class ClassSession
     public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
     public ConcurrentDictionary<string, ClassParticipant> Participants { get; } = new();
     public ConcurrentDictionary<string, ScoredRun> Results { get; } = new();
+    public ConcurrentDictionary<string, ScoredRun> Progress { get; } = new();
     public object Gate { get; } = new();
 }
 
@@ -30,7 +31,7 @@ public sealed record SubmittedCase(string CaseId, string InitialVerdict, string 
 public sealed record ScoreBreakdown(int Accuracy, int Investigation, int Responsibility, int Confidence, int Adaptability, int Total);
 public sealed record ScoredCase(string CaseId, string InitialVerdict, string FinalVerdict, int Confidence, string ResponsibleAction, IReadOnlyList<string> UsedInvestigations, ScoreBreakdown Score);
 public sealed record ScoredRun(string RunId, string ParticipantId, string PlayerName, int DurationSeconds, DateTimeOffset SubmittedAt, IReadOnlyList<ScoredCase> Cases, ScoreBreakdown Score);
-public sealed record LeaderboardEntry(int Rank, string PlayerName, int TotalScore, int Accuracy, int Investigation, int Responsibility, int Confidence, int DurationSeconds);
+public sealed record LeaderboardEntry(int Rank, string PlayerName, int TotalScore, int Accuracy, int Investigation, int Responsibility, int Confidence, int DurationSeconds, int CasesCompleted, int TotalCases, bool IsCompleted);
 public sealed record VerdictDistribution(string Verdict, int Count, double Percent);
 public sealed record CaseOpinionStats(string CaseId, IReadOnlyList<VerdictDistribution> Initial, IReadOnlyList<VerdictDistribution> Final);
 public sealed record NamedCount(string Name, int Count);

@@ -587,7 +587,15 @@ function ClassDashboard({ data, leaders, hideLeaderboard }) {
       <div className={hideLeaderboard ? "" : "tr-dashboard-layout"}>
         {!hideLeaderboard && (
           <aside className="tr-dashboard-sidebar">
-            <section className="tr-leaderboard"><div className="tr-section-title"><Medal size={21} /><h2>Điểm nổi bật</h2></div>{leaders.length === 0 ? <p>Chưa có kết quả.</p> : leaders.slice(0, 10).map((item, index) => <div key={item.playerName}><span className="tr-rank">{index + 1}</span><b>{item.playerName}</b><span>{item.totalScore} điểm</span></div>)}</section>
+            <section className="tr-leaderboard">
+              <div className="tr-section-title"><Medal size={21} /><h2>Bảng xếp hạng</h2></div>
+              <p className="tr-ranking-hint">Cập nhật sau mỗi câu · tự làm mới mỗi 2 giây. Thứ hạng tạm thời thay đổi khi mọi người tiếp tục chơi.</p>
+              {leaders.length === 0 ? <p>Chưa ai hoàn thành câu đầu tiên.</p> : <div className="tr-ranking-list" role="list" aria-label="Bảng xếp hạng lớp">{leaders.map((item) => <div className="tr-ranking-row" role="listitem" key={item.playerName}>
+                <span className="tr-rank">{item.rank}</span>
+                <div><b>{item.playerName}</b><small>{item.casesCompleted}/{item.totalCases} câu · {item.isCompleted ? "Đã hoàn thành" : "Đang chơi"}</small></div>
+                <span>{item.totalScore} điểm</span>
+              </div>)}</div>}
+            </section>
           </aside>
         )}
         <div className="tr-dashboard-main">
@@ -639,7 +647,7 @@ function TeacherScreen({ onHome }) {
       finally { inFlight = false; }
     }
     refresh();
-    const id = window.setInterval(refresh, 5000);
+    const id = window.setInterval(refresh, 2000);
     return () => { active = false; window.clearInterval(id); };
   }, [session]);
   return (
@@ -651,7 +659,7 @@ function TeacherScreen({ onHome }) {
           <span><GraduationCap size={34} /></span>
           <Pill tone="info">CHẾ ĐỘ LỚP HỌC</Pill>
           <h1>Tạo một phiên cho cả lớp</h1>
-          <p>Học sinh nhập mã rồi chơi theo tốc độ riêng. Bảng này tự cập nhật khi từng người hoàn thành.</p>
+          <p>Học sinh nhập mã rồi chơi theo tốc độ riêng. Bảng xếp hạng cập nhật điểm sau mỗi câu; thống kê tổng kết tính người đã hoàn thành cả bộ.</p>
           <p className="tr-field-hint">Cả lớp chơi cùng một bộ 8 hồ sơ · tối đa 800 điểm.</p>
           <ErrorBanner message={error} />
           <Button onClick={createSession} isLoading={busy}>TẠO MÃ LỚP <ChevronRight size={18} /></Button>
@@ -679,6 +687,8 @@ export function TruthRushApp() {
   const [submissionAttempt, setSubmissionAttempt] = useState(0);
   const [storageError, setStorageError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [progressError, setProgressError] = useState("");
+  const completedCount = run?.cases.filter((item) => item.step === "REVEAL").length ?? 0;
 
   const progress = run ? run.cases[run.caseIndex] : null;
   const caseData = progress ? getCase(progress.caseId) : null;
@@ -729,6 +739,36 @@ export function TruthRushApp() {
   useEffect(() => {
     if (seconds === 0 && progress?.step === "INVESTIGATION") commit((next) => { next.cases[next.caseIndex].step = "FINAL"; });
   }, [seconds, progress?.step]);
+
+  useEffect(() => {
+    setProgressError("");
+    if (!run?.player.classCode || !completedCount || run.submitted) return;
+    let active = true;
+    let retryTimer;
+    let inFlight = false;
+    let synced = false;
+    const controller = new AbortController();
+    // The snapshot contains only confirmed answers, including zero-point cases.
+    const payload = submissionPayload(run, true);
+    async function sync() {
+      if (!active || inFlight || synced) return;
+      inFlight = true;
+      try {
+        await classApi.progress(run.player.classCode, payload, AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]));
+        if (active) { synced = true; setProgressError(""); }
+      } catch (err) {
+        if (!active) return;
+        setProgressError(`Chưa cập nhật được bảng xếp hạng: ${err.message} Điểm vẫn được lưu trên máy; game sẽ tự gửi lại.`);
+        retryTimer = window.setTimeout(sync, 5000);
+      } finally {
+        inFlight = false;
+      }
+    }
+    sync();
+    const onOnline = () => { window.clearTimeout(retryTimer); sync(); };
+    window.addEventListener("online", onOnline);
+    return () => { active = false; controller.abort(); window.clearTimeout(retryTimer); window.removeEventListener("online", onOnline); };
+  }, [run?.runId, completedCount, run?.submitted]);
 
   useEffect(() => {
     if (!run || run.status !== "RESULT" || !run.player.classCode || run.submitted) return;
@@ -783,7 +823,7 @@ export function TruthRushApp() {
   const gameMain = (
     <>
       <GameHeader caseData={caseData} caseIndex={run.caseIndex} caseCount={run.cases.length} progress={progress} seconds={seconds} currentScore={currentScore} />
-      <main className="tr-game-main"><ErrorBanner message={storageError} />{["FINAL", "CONFIDENCE", "ACTION"].includes(progress.step) && <EvidenceNotebook caseData={caseData} progress={progress} onOpen={setEvidence} />}{content}</main>
+      <main className="tr-game-main"><ErrorBanner message={storageError} /><ErrorBanner message={progressError} />{["FINAL", "CONFIDENCE", "ACTION"].includes(progress.step) && <EvidenceNotebook caseData={caseData} progress={progress} onOpen={setEvidence} />}{content}</main>
       <EvidenceSheet check={evidence && progress.usedInvestigations.includes(evidence.id) ? evidence : null} onClose={() => setEvidence(null)} />
     </>
   );

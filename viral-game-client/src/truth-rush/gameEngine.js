@@ -147,11 +147,11 @@ export function clearRun() {
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* game can still run in memory */ }
 }
 
-export function submissionPayload(run) {
+export function submissionPayload(run, completedOnly = false) {
   return {
     participantToken: run.player.participantToken,
     runId: run.runId,
     durationSeconds: Math.max(1, Math.min(7200, Math.round((Date.now() - Date.parse(run.startedAt)) / 1000))),
-    cases: run.cases.map((item) => ({ caseId: item.caseId, initialVerdict: item.initialVerdict, finalVerdict: item.finalVerdict, confidence: item.confidence, responsibleAction: item.responsibleAction, usedInvestigations: item.usedInvestigations })),
+    cases: run.cases.filter((item) => !completedOnly || item.step === "REVEAL").map((item) => ({ caseId: item.caseId, initialVerdict: item.initialVerdict, finalVerdict: item.finalVerdict, confidence: item.confidence, responsibleAction: item.responsibleAction, usedInvestigations: item.usedInvestigations })),
   };
 }

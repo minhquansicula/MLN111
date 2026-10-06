@@ -50,8 +50,50 @@ public sealed class TruthRushClassService(TruthRushStore store, TruthRushSetting
         {
             if (session.Results.TryGetValue(key, out var existing)) return existing;
             if (session.Results.Values.Any(item => item.ParticipantId == participant.Id)) throw new TruthRushValidationException("Bạn đã nộp kết quả cho lớp này.");
+            if (session.Progress.TryGetValue(participant.Id, out var progress)) ValidateExtension(progress, result);
             session.Results[key] = result;
+            session.Progress.TryRemove(participant.Id, out _);
             return result;
+        }
+    }
+
+    public ScoredRun UpdateProgress(string rawCode, SubmitRunRequest request)
+    {
+        var session = Find(rawCode);
+        var participant = session.Participants.Values.FirstOrDefault(item => FixedEquals(item.Token, request.ParticipantToken))
+            ?? throw new UnauthorizedAccessException("Phiên người chơi không hợp lệ.");
+        var result = scoring.Score(participant.Id, participant.Name, request, allowPartial: true);
+        if (result.Cases.Any(item => !TruthRushRubrics.Packs[session.PackId].Contains(item.CaseId)))
+            throw new TruthRushValidationException("Tiến độ không thuộc bộ hồ sơ của lớp.");
+        lock (session.Gate)
+        {
+            // A delayed retry must never replace a final result or roll back newer answers.
+            var existing = session.Results.Values.FirstOrDefault(item => item.ParticipantId == participant.Id)
+                ?? session.Progress.GetValueOrDefault(participant.Id);
+            if (existing is not null)
+            {
+                if (result.Cases.Count <= existing.Cases.Count)
+                {
+                    ValidateExtension(result, existing);
+                    return existing;
+                }
+                ValidateExtension(existing, result);
+            }
+            session.Progress[participant.Id] = result;
+            return result;
+        }
+    }
+
+    private static void ValidateExtension(ScoredRun previous, ScoredRun next)
+    {
+        if (previous.RunId != next.RunId) throw new TruthRushValidationException("Lớp này đã ghi nhận một lượt chơi khác của bạn.");
+        foreach (var item in previous.Cases)
+        {
+            var updated = next.Cases.FirstOrDefault(value => value.CaseId == item.CaseId);
+            if (updated is null || item.InitialVerdict != updated.InitialVerdict || item.FinalVerdict != updated.FinalVerdict
+                || item.Confidence != updated.Confidence || item.ResponsibleAction != updated.ResponsibleAction
+                || !item.UsedInvestigations.ToHashSet(StringComparer.Ordinal).SetEquals(updated.UsedInvestigations))
+                throw new TruthRushValidationException("Không thể thay đổi câu trả lời đã ghi nhận trên bảng xếp hạng.");
         }
     }
 
@@ -74,14 +116,20 @@ public sealed class TruthRushClassService(TruthRushStore store, TruthRushSetting
     {
         var session = Find(rawCode);
         AuthorizeStats(session, token);
-        return session.Results.Values
-            .OrderByDescending(run => run.Score.Accuracy)
-            .ThenByDescending(run => run.Score.Investigation)
-            .ThenByDescending(run => run.Score.Responsibility)
-            .ThenByDescending(run => run.Score.Confidence)
-            .ThenBy(run => run.DurationSeconds)
-            .Select((run, index) => new LeaderboardEntry(index + 1, run.PlayerName, run.Score.Total, run.Score.Accuracy, run.Score.Investigation, run.Score.Responsibility, run.Score.Confidence, run.DurationSeconds))
-            .ToArray();
+        lock (session.Gate)
+        {
+            var finished = session.Results.Values.ToDictionary(run => run.ParticipantId);
+            return session.Progress.Values.Where(run => !finished.ContainsKey(run.ParticipantId)).Concat(finished.Values)
+                .OrderByDescending(run => run.Score.Accuracy)
+                .ThenByDescending(run => run.Score.Investigation)
+                .ThenByDescending(run => run.Score.Responsibility)
+                .ThenByDescending(run => run.Score.Confidence)
+                .ThenBy(run => run.DurationSeconds)
+                .ThenBy(run => run.PlayerName, StringComparer.Ordinal)
+                .ThenBy(run => run.ParticipantId, StringComparer.Ordinal)
+                .Select((run, index) => new LeaderboardEntry(index + 1, run.PlayerName, run.Score.Total, run.Score.Accuracy, run.Score.Investigation, run.Score.Responsibility, run.Score.Confidence, run.DurationSeconds, run.Cases.Count, TruthRushRubrics.Packs[session.PackId].Length, finished.ContainsKey(run.ParticipantId)))
+                .ToArray();
+        }
     }
 
     public object SessionInfo(string rawCode)

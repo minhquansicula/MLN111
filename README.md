@@ -39,14 +39,16 @@ Mỗi hồ sơ có hình minh họa và chú thích. Ảnh sân trường do AI 
 
 Mở `/teacher` hoặc chọn **Tôi là giáo viên** trên trang đầu, sau đó tạo mã gồm 6 ký tự. Học sinh nhập mã này và chơi theo tốc độ riêng, không có phòng chờ.
 
-Lớp tạo mới tự động dùng bộ đầy đủ 8 hồ sơ. Backend chỉ nhận kết quả đủ 8 hồ sơ khác nhau cho lớp này. Phiên giáo viên được giữ trong `sessionStorage` để tải lại cùng tab vẫn mở được dashboard. Lượt chơi và lớp cũ gồm 4 hồ sơ vẫn được hỗ trợ để tiếp tục; tạo lượt/lớp mới để chơi đủ 8.
+Lớp tạo mới tự động dùng bộ đầy đủ 8 hồ sơ. Sau mỗi câu đã chấm, game gửi quyết định lên backend để cập nhật bảng xếp hạng; tải lại và tiếp tục cũng gửi lại tiến độ đã lưu. Nếu mất mạng, game giữ điểm trên máy và tự thử gửi lại mỗi 5 giây hoặc khi mạng trở lại. Bài nộp cuối vẫn phải có đủ 8 hồ sơ khác nhau. Phiên giáo viên được giữ trong `sessionStorage` để tải lại cùng tab vẫn mở được dashboard. Lượt chơi và lớp cũ gồm 4 hồ sơ vẫn được hỗ trợ để tiếp tục; tạo lượt/lớp mới để chơi đủ 8.
 
 Dashboard cập nhật:
 
 - số người tham gia và hoàn thành;
 - điểm, độ chính xác, điều tra và trách nhiệm trung bình;
 - phân bố ý kiến trước và sau điều tra;
-- bảng xếp hạng ưu tiên độ chính xác, chất lượng điều tra, trách nhiệm, độ tự tin rồi mới đến tốc độ.
+- bảng xếp hạng của toàn bộ người đã hoàn thành ít nhất một câu, kèm tiến độ và trạng thái đang chơi/hoàn thành; tự làm mới mỗi 2 giây. Thứ hạng ưu tiên độ chính xác, chất lượng điều tra, trách nhiệm, độ tự tin rồi mới đến tốc độ. Đây là thứ hạng tạm thời khi lớp còn đang chơi; người đã làm nhiều câu có thể đứng cao hơn. Nếu mọi tiêu chí bằng nhau, tên rồi ID người chơi quyết định thứ tự ổn định.
+
+Các điểm trung bình và phân bố ý kiến chỉ tính bài đã nộp đủ bộ. Tiến độ gửi trùng hoặc đến muộn không cộng thêm điểm, không lùi số câu đã làm và không sửa câu trả lời đã ghi nhận.
 
 Điểm lớp được backend tính lại từ quyết định gốc. Server kiểm tra case, phán quyết, hành động, độ tự tin, danh sách bằng chứng và ngân sách Investigation Points; client không thể tự gửi tổng điểm.
 
@@ -58,6 +60,7 @@ API:
 | GET | `/api/class-sessions/{code}` | Xem trạng thái công khai |
 | POST | `/api/class-sessions/{code}/join` | Tham gia lớp |
 | POST | `/api/class-sessions/{code}/results` | Nộp quyết định để server chấm |
+| PUT | `/api/class-sessions/{code}/progress` | Gửi các câu đã chấm cùng participant token và run ID để cập nhật thứ hạng tạm thời |
 | GET | `/api/class-sessions/{code}/stats` | Thống kê lớp |
 | GET | `/api/class-sessions/{code}/leaderboard` | Bảng xếp hạng |
 

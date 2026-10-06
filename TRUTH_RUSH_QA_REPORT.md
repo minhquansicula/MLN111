@@ -1,5 +1,42 @@
 # Truth Rush — báo cáo kiểm thử ngày 06/10/2026
 
+## Kiểm thử lại sau khi bổ sung xếp hạng trực tiếp
+
+Chạy lại `npm test`: toàn bộ 46 nhóm đạt, gồm kịch bản 35 người gửi 280 lần cập nhật qua 8 câu và các kiểm tra idempotency/đến sai thứ tự/phân quyền/nộp cuối đã mô tả bên dưới. Không thay đổi code sản phẩm trong lượt kiểm thử này.
+
+Đã chơi đủ 8 câu qua giao diện production với tên QA, chọn Đúng, tự tin 70% và Chia sẻ để có cả câu đúng lẫn câu sai. Riêng hồ sơ 4 mở kiểm tra nguồn, reload và đọc lại miễn phí. Điểm ở header và bảng giáo viên khớp sau mỗi câu:
+
+| Thứ tự chơi | Hồ sơ | Điểm câu | Tổng trên máy và bảng giáo viên |
+|---|---|---:|---:|
+| 1 | Con số 300% | 0 | 0 |
+| 2 | Ảnh chụp bị cắt | 54 | 54 |
+| 3 | Học bổng lan truyền | 0 | 54 |
+| 4 | Cảnh báo rò rỉ dữ liệu | 3 | 57 |
+| 5 | Bức ảnh đúng, chú thích sai | 0 | 57 |
+| 6 | AI và phép tính 40% | 0 | 57 |
+| 7 | Miễn phí có đúng là miễn phí? | 64 | 121 |
+| 8 | Giọng nói giống chưa đủ | 0 | 121 |
+
+- Proxy local trả 503 cho lần gửi tiến độ đầu tiên: câu 0 điểm vẫn được tự gửi lại, xuất hiện trên bảng `1/8`, cảnh báo tự biến mất.
+- Reload trong điều tra hồ sơ 4 giữ 54 điểm, 3 điểm ĐT, kiểm tra nguồn đã lưu và đồng hồ 81 giây; đọc lại không trừ thêm ngân sách. Chấm xong tăng thành 57 điểm và `4/8` trên bảng.
+- Reload giáo viên giữ đúng lớp và tiến độ. Mỗi câu tiếp theo được đối chiếu sau khi bảng tự làm mới, không cần reload thủ công.
+- Khi đã chấm đủ 8 nhưng chưa nộp, bảng có một hàng `8/8 · Đang chơi`, 121 điểm; thống kê hoàn thành vẫn `0/1`.
+- Proxy trả 503 cho lần nộp cuối: màn tổng kết giữ 121, có nút GỬI LẠI KẾT QUẢ, nút KẾT QUẢ LỚP bị khóa và bảng chưa đánh dấu hoàn thành.
+- Gửi lại thành công: bảng chỉ có một hàng, `8/8 · Đã hoàn thành`, 121 điểm; thống kê `1/1`, trung bình 121, chính xác 80, điều tra 10, trách nhiệm 30. Reload người chơi không làm mất kết quả hoặc nộp trùng; xem kết quả lớp khớp và xem lại có đủ 8 hồ sơ, đúng thứ tự đã chơi.
+- Không có lỗi JavaScript trong console được kiểm tra. Các lỗi HTTP 503 được chủ động tạo để thử khả năng phục hồi.
+
+Ảnh kiểm chứng: `.artifacts/truth-rush-live-retest.jpg`. Kiểm tra UI lần này dùng viewport desktop thực tế 1272 px; không bổ sung xác nhận mobile hay 35 thiết bị Wi-Fi thật. Vấn đề thời lượng do client cung cấp được ghi nhận bên dưới vẫn chưa thay đổi.
+
+## Cập nhật: bảng xếp hạng sau từng câu
+
+Bản mới gửi các câu đã chấm lên `PUT /api/class-sessions/{code}/progress`. Backend tự chấm lại, giữ câu trả lời đã ghi nhận và chỉ nhận phần mở rộng của cùng lượt chơi. Bảng giáo viên tự làm mới mỗi 2 giây, có số câu đã làm/trạng thái, và danh sách cuộn đủ toàn bộ người chơi. Thống kê trung bình và ý kiến tiếp tục chỉ tính bài nộp đủ bộ.
+
+46 nhóm kiểm tra tự động đạt (31 backend, 14 frontend, 1 integration HTTP). Kịch bản mới mô phỏng 35 người cập nhật đồng thời qua 8 câu (280 lần cập nhật), đối chiếu điểm và thứ hạng sau mỗi vòng. Đã kiểm tra câu 0 điểm, retry 10 lần, snapshot đến sai thứ tự, đảo thứ tự case/bằng chứng, sửa đáp án cũ, đổi run ID, sai quyền/bộ/ngân sách, và progress đến muộn cùng lúc với bài nộp cuối. Không có cộng trùng, lùi tiến độ hay hàng xếp hạng trùng.
+
+Trên giao diện production: người chơi thật chấm câu đầu được 75 điểm và giáo viên hiển thị ngay `1/8 câu · Đang chơi`; reload và tiếp tục giữ điểm; câu thứ hai được 0 điểm vẫn cập nhật thành `2/8`. Proxy local chủ động trả 503 cho hai lần gửi tiến độ đầu: giao diện giữ 75 điểm, hiện thông báo lỗi, tự gửi lại thành công và xóa thông báo. Dashboard gồm 35 người (2 qua UI, 33 giả lập HTTP), với 4 hoàn thành và 31 đang chơi, hiển thị đủ 35 hàng và đúng số đếm `4/35`. Production build đạt.
+
+Giới hạn top 10 bên dưới đã được khắc phục bằng danh sách cuộn. Khi bằng mọi tiêu chí điểm/thời lượng, tên và ID tạo thứ tự ổn định; vẫn là hạng tuần tự. Vấn đề thời lượng từ client bên dưới vẫn còn. Các phần còn lại ghi nhận lần kiểm thử trước khi thêm cập nhật tiến độ.
+
 Đã kiểm tra bản nội dung và rubric đang nằm trong workspace, gồm production bundle đã build ngày 06/10/2026. Không phát hành thay đổi trong lần kiểm thử này.
 
 ## Kết quả
