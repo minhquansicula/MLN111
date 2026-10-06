@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { getCase } from "../src/truth-rush/cases.js";
+import { VERDICTS, ACTIONS, getCase } from "../src/truth-rush/cases.js";
 import { scoreCase } from "../src/truth-rush/gameEngine.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,7 +26,7 @@ function caseResult(caseId, initialVerdict, finalVerdict, confidence, responsibl
 const perfectCases = [
   caseResult("case_01", "TRUE", "FALSE", 100, "REPORT", ["check_official", "check_source", "check_author"]),
   caseResult("case_02", "TRUE", "MISLEADING", 100, "ADD_CONTEXT", ["check_statistics", "check_sample", "check_source"]),
-  caseResult("case_03", "FALSE", "TRUE", 100, "SHARE", ["view_full_context", "check_official"]),
+  caseResult("case_03", "FALSE", "TRUE", 100, "ADD_CONTEXT", ["view_full_context", "check_official"]),
   caseResult("case_04", "TRUE", "NOT_ENOUGH_EVIDENCE", 100, "WAIT_FOR_MORE_EVIDENCE", ["check_source", "check_image", "check_date", "search_other_news"]),
 ];
 
@@ -75,6 +75,20 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
       headers: { "X-Session-Token": unfinished.data.participantToken },
     });
     assert.equal(earlyStats.response.status, 401);
+    for (const endpoint of ["stats", "leaderboard"]) {
+      for (const token of [undefined, "wrong-token", unfinished.data.participantToken]) {
+        const denied = await request(`/api/class-sessions/${created.data.code}/${endpoint}`, {
+          headers: token ? { "X-Session-Token": token } : {},
+        });
+        assert.equal(denied.response.status, 401);
+      }
+    }
+    const missingClass = await request("/api/class-sessions/ZZZZZZ/join", { method: "POST", body: JSON.stringify({ playerName: "Missing" }) });
+    assert.equal(missingClass.response.status, 404);
+    for (const playerName of [null, "", "   ", "a".repeat(25), "Bad\nName"]) {
+      const invalidName = await request(`/api/class-sessions/${created.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName }) });
+      assert.equal(invalidName.response.status, 400);
+    }
 
     const submitted = await request(`/api/class-sessions/${created.data.code}/results`, {
       method: "POST",
@@ -114,6 +128,26 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
       }),
     });
     assert.equal(rejected.response.status, 400);
+
+    const invalidChanges = [
+      { confidence: 55 }, { initialVerdict: "UNKNOWN" }, { finalVerdict: "UNKNOWN" },
+      { responsibleAction: "UNKNOWN" }, { usedInvestigations: ["made_up"] },
+      { usedInvestigations: ["check_source", "check_source"] }, { usedInvestigations: [null] },
+      { caseId: "case_unknown" },
+    ];
+    for (const change of invalidChanges) {
+      const invalidCases = perfectCases.map((item, index) => index === 0 ? { ...item, ...change } : item);
+      const invalidResult = await request(`/api/class-sessions/${created.data.code}/results`, {
+        method: "POST", body: JSON.stringify({ participantToken: unfinished.data.participantToken, runId: "invalid-fields", durationSeconds: 600, cases: invalidCases }),
+      });
+      assert.equal(invalidResult.response.status, 400);
+    }
+    for (const change of [{ runId: null }, { runId: "" }, { runId: "a".repeat(81) }, { durationSeconds: 0 }, { durationSeconds: 7201 }]) {
+      const invalidRun = await request(`/api/class-sessions/${created.data.code}/results`, {
+        method: "POST", body: JSON.stringify({ participantToken: unfinished.data.participantToken, runId: "invalid-run", durationSeconds: 600, cases: perfectCases, ...change }),
+      });
+      assert.equal(invalidRun.response.status, 400);
+    }
 
     const invalidPack = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "unknown" }) });
     assert.equal(invalidPack.response.status, 400);
@@ -161,6 +195,21 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(fullResult.response.status, 200);
     assert.equal(fullResult.data.cases.length, 8);
     assert.equal(fullResult.data.score.total, 800);
+    const unauthorizedSubmission = await request(`/api/class-sessions/${complete.data.code}/results`, {
+      method: "POST", body: JSON.stringify({ ...completePayload, participantToken: "wrong-token" }),
+    });
+    assert.equal(unauthorizedSubmission.response.status, 401);
+    const concurrentRetries = await Promise.all(Array.from({ length: 10 }, () => request(`/api/class-sessions/${complete.data.code}/results`, {
+      method: "POST", body: JSON.stringify(completePayload),
+    })));
+    for (const retried of concurrentRetries) {
+      assert.equal(retried.response.status, 200);
+      assert.deepEqual(retried.data, fullResult.data);
+    }
+    const secondRun = await request(`/api/class-sessions/${complete.data.code}/results`, {
+      method: "POST", body: JSON.stringify({ ...completePayload, runId: "second-completed-run" }),
+    });
+    assert.equal(secondRun.response.status, 400);
     for (const item of fullResult.data.cases) assert.deepEqual(item.score, scoreCase(getCase(item.caseId), allCases.find((value) => value.caseId === item.caseId)));
     const fullStats = await request(`/api/class-sessions/${complete.data.code}/stats`, { headers: { "X-Session-Token": complete.data.teacherToken } });
     assert.equal(fullStats.data.averageScore, 800);
@@ -173,6 +222,28 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
     assert.equal(rankingResult.response.status, 200);
     const rankedBoard = await request(`/api/class-sessions/${complete.data.code}/leaderboard`, { headers: { "X-Session-Token": complete.data.teacherToken } });
     assert.deepEqual(rankedBoard.data.map((entry) => [entry.rank, entry.playerName]), [[1, "Eight-case player"], [2, "Ranking Tester"]]);
+
+    const contentClass = await request("/api/class-sessions", { method: "POST", body: JSON.stringify({ packId: "foundation" }) });
+    assert.equal(contentClass.response.status, 201);
+    for (const responsibleAction of ["ADD_CONTEXT", "SHARE"]) {
+      const contentPlayer = await request(`/api/class-sessions/${contentClass.data.code}/join`, {
+        method: "POST", body: JSON.stringify({ playerName: `Content ${responsibleAction}` }),
+      });
+      assert.equal(contentPlayer.response.status, 200);
+      const contentCases = perfectCases.map((item) => item.caseId === "case_03"
+        ? { ...item, responsibleAction, usedInvestigations: ["check_date", "check_metadata", "check_comments"] }
+        : item);
+      const contentResult = await request(`/api/class-sessions/${contentClass.data.code}/results`, {
+        method: "POST", body: JSON.stringify({ participantToken: contentPlayer.data.participantToken, runId: `content-${responsibleAction}`, durationSeconds: 600, cases: contentCases }),
+      });
+      assert.equal(contentResult.response.status, 200);
+      for (const item of contentResult.data.cases) {
+        assert.deepEqual(item.score, scoreCase(getCase(item.caseId), contentCases.find((value) => value.caseId === item.caseId)));
+      }
+      const aiCase = contentResult.data.cases.find((item) => item.caseId === "case_03");
+      assert.equal(aiCase.score.investigation, 12);
+      assert.equal(aiCase.score.responsibility, responsibleAction === "ADD_CONTEXT" ? 20 : 10);
+    }
 
     // Exercise all leaderboard tie-breakers with a full 35-player classroom.
     const largeClass = await request("/api/class-sessions", { method: "POST" });
@@ -238,6 +309,82 @@ test("classroom HTTP API completes a secure scoring round trip", { timeout: 20_0
       || left.durationSeconds - right.durationSeconds
     ).map((result) => result.playerName);
     assert.deepEqual(largeBoard.data.map((entry) => entry.playerName), expectedLargeOrder);
+
+    // Only completed players affect statistics, even when the class reaches capacity.
+    const extraPlayers = await Promise.all(Array.from({ length: 65 }, (_, index) => request(`/api/class-sessions/${largeClass.data.code}/join`, {
+      method: "POST", body: JSON.stringify({ playerName: `Unfinished ${index + 1}` }),
+    })));
+    for (const extraPlayer of extraPlayers) assert.equal(extraPlayer.response.status, 200);
+    const overflow = await request(`/api/class-sessions/${largeClass.data.code}/join`, {
+      method: "POST", body: JSON.stringify({ playerName: "Overflow 101" }),
+    });
+    assert.equal(overflow.response.status, 400);
+    const capacityStats = await request(`/api/class-sessions/${largeClass.data.code}/stats`, { headers: { "X-Session-Token": largeClass.data.teacherToken } });
+    assert.equal(capacityStats.data.playersJoined, 100);
+    assert.equal(capacityStats.data.playersCompleted, 35);
+    assert.equal(capacityStats.data.averageScore, expectedAverage);
+    const capacityBoard = await request(`/api/class-sessions/${largeClass.data.code}/leaderboard`, { headers: { "X-Session-Token": largeClass.data.teacherToken } });
+    assert.deepEqual(capacityBoard.data, largeBoard.data);
+
+    // Entirely equal scores and duration still produce one row per participant.
+    const tieClass = await request("/api/class-sessions", { method: "POST" });
+    assert.equal(tieClass.response.status, 201);
+    const tiePlayers = await Promise.all(["Tie A", "Tie B", "Tie C"].map(async (playerName) => {
+      const tiePlayer = await request(`/api/class-sessions/${tieClass.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName }) });
+      assert.equal(tiePlayer.response.status, 200);
+      const tieResult = await request(`/api/class-sessions/${tieClass.data.code}/results`, {
+        method: "POST", body: JSON.stringify({ participantToken: tiePlayer.data.participantToken, runId: playerName, durationSeconds: 600, cases: allCases }),
+      });
+      assert.equal(tieResult.response.status, 200);
+      return tiePlayer.data;
+    }));
+    const tieBoard = await request(`/api/class-sessions/${tieClass.data.code}/leaderboard`, { headers: { "X-Session-Token": tieClass.data.teacherToken } });
+    assert.deepEqual(tieBoard.data.map((entry) => entry.rank), [1, 2, 3]);
+    assert.deepEqual(tieBoard.data.map((entry) => entry.playerName).sort(), ["Tie A", "Tie B", "Tie C"]);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const repeatedTieBoard = await request(`/api/class-sessions/${tieClass.data.code}/leaderboard`, { headers: { "X-Session-Token": tiePlayers[0].participantToken } });
+      assert.deepEqual(repeatedTieBoard.data, tieBoard.data);
+    }
+    const racedPlayer = await request(`/api/class-sessions/${tieClass.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Racing Player" }) });
+    assert.equal(racedPlayer.response.status, 200);
+    const competingRuns = await Promise.all(["race-one", "race-two"].map((runId) => request(`/api/class-sessions/${tieClass.data.code}/results`, {
+      method: "POST", body: JSON.stringify({ participantToken: racedPlayer.data.participantToken, runId, durationSeconds: 700, cases: allCases }),
+    })));
+    assert.deepEqual(competingRuns.map((item) => item.response.status).sort(), [200, 400]);
+    const raceStats = await request(`/api/class-sessions/${tieClass.data.code}/stats`, { headers: { "X-Session-Token": tieClass.data.teacherToken } });
+    assert.equal(raceStats.data.playersCompleted, 4);
+
+    const unicodePlayer = await request(`/api/class-sessions/${tieClass.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "  Nguyễn  " }) });
+    assert.equal(unicodePlayer.response.status, 200);
+    assert.equal(unicodePlayer.data.playerName, "Nguyễn");
+    const unicodeDuplicate = await request(`/api/class-sessions/${tieClass.data.code}/join`, { method: "POST", body: JSON.stringify({ playerName: "Nguyễn".normalize("NFD") }) });
+    assert.equal(unicodeDuplicate.response.status, 400);
+
+    // Check every verdict/confidence/action combination on every case against C#.
+    const matrixClass = await request("/api/class-sessions", { method: "POST" });
+    assert.equal(matrixClass.response.status, 201);
+    const decisionMatrix = VERDICTS.flatMap((verdict) => [50, 60, 70, 80, 90, 100].flatMap((confidence) =>
+      ACTIONS.map((action) => ({ finalVerdict: verdict.id, confidence, responsibleAction: action.id }))));
+    await Promise.all(decisionMatrix.map(async (decision, index) => {
+      const player = await request(`/api/class-sessions/${matrixClass.data.code}/join`, {
+        method: "POST", body: JSON.stringify({ playerName: `Matrix ${index}` }),
+      });
+      assert.equal(player.response.status, 200);
+      const cases = allCases.map((item) => ({ ...item, ...decision,
+        initialVerdict: index % 2 ? getCase(item.caseId).correctVerdict : "MISLEADING",
+        usedInvestigations: index % 3 === 0 ? [] : item.usedInvestigations,
+      }));
+      const scored = await request(`/api/class-sessions/${matrixClass.data.code}/results`, {
+        method: "POST", body: JSON.stringify({ participantToken: player.data.participantToken, runId: `matrix-${index}`, durationSeconds: 600, cases }),
+      });
+      assert.equal(scored.response.status, 200);
+      for (const item of scored.data.cases) {
+        assert.deepEqual(item.score, scoreCase(getCase(item.caseId), cases.find((value) => value.caseId === item.caseId)));
+        assert.ok(item.score.total >= 0 && item.score.total <= 100);
+      }
+    }));
+    const matrixStats = await request(`/api/class-sessions/${matrixClass.data.code}/stats`, { headers: { "X-Session-Token": matrixClass.data.teacherToken } });
+    assert.equal(matrixStats.data.playersCompleted, 96);
   } finally {
     server.kill();
   }

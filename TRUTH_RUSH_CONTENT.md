@@ -1,5 +1,14 @@
 # Nội dung và kiểm tra Truth Rush
 
+## Rà soát logic ngày 06/10/2026
+
+- Hồ sơ 2: bản tin khoa chỉ đối chiếu số ca của một lớp, không khẳng định tỷ lệ toàn khoa khi chưa có báo cáo tổng hợp. Hai bài dẫn cùng bảng không được coi là hai nguồn dữ liệu độc lập.
+- Hồ sơ 3: giữ phán quyết Đúng cho khẳng định được dùng AI trong bài tập số 2; ưu tiên Bổ sung bối cảnh để nêu yêu cầu ghi công cụ, kiểm tra đầu ra và tự giải thích. Hành động này được 20 điểm, chia sẻ nguyên bài được 10 điểm.
+- Hồ sơ 3: ngày hiển thị và metadata mỗi kiểm tra được 5 điểm; cùng bình luận chỉ đạt 12 điểm. Muốn đạt tối đa 25 điểm điều tra phải có xác nhận trực tiếp từ ảnh đầy đủ hoặc LMS, vẫn trong ngân sách 3 điểm.
+- Hồ sơ 4: thông báo đang điều tra không xác nhận vụ rò rỉ. Chờ xác minh trước khi lan truyền vẫn đi cùng phòng ngừa qua trang chính thức, gồm bật xác thực hai bước và đổi mật khẩu nếu đã nhập vào biểu mẫu lạ.
+- Màn chọn độ tự tin nói rõ người chơi đánh giá phán quyết của mình. Với Chưa đủ bằng chứng, đó là mức chắc chắn về việc chứng cứ hiện tại chưa đủ, không phải xác suất sự việc xảy ra.
+- Rubric frontend và backend được cập nhật cùng nhau; regression kiểm tra điểm hành động, giới hạn bằng chứng phụ và kết quả chấm lại qua API.
+
 ## Bộ Nâng cao
 
 Mỗi lượt mới gồm đủ 8 hồ sơ trong một bộ, tối đa 800 điểm: 4 hồ sơ gốc tiếp nối 4 hồ sơ nâng cao. Ba hồ sơ đầu mỗi chặng xáo thứ tự; hồ sơ khủng hoảng ở vị trí 4 và 8. Toàn bộ nhân vật, văn bản, nghiên cứu, số liệu và hình ảnh là dữ liệu hư cấu phục vụ học tập.

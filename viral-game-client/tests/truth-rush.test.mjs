@@ -41,6 +41,26 @@ test("high confidence in a wrong verdict is penalized and score never goes below
   assert.equal(score.total, 0);
 });
 
+test("AI permission rewards sharing conditions and requires direct evidence for full investigation credit", () => {
+  const item = getCase("case_03");
+  const withConditions = scoreCase(item, progress(item, {
+    initialVerdict: "FALSE",
+    responsibleAction: "ADD_CONTEXT",
+    usedInvestigations: ["view_full_context", "check_official"],
+  }));
+  assert.equal(withConditions.total, 100);
+  assert.equal(withConditions.responsibility, 20);
+  const plainShare = scoreCase(item, progress(item, { responsibleAction: "SHARE" }));
+  assert.equal(plainShare.responsibility, 10);
+  const supportingChecks = item.checks.filter((check) => !check.strong);
+  for (let mask = 0; mask < 2 ** supportingChecks.length; mask++) {
+    const selected = supportingChecks.filter((_, index) => mask & (1 << index));
+    if (selected.reduce((sum, check) => sum + check.cost, 0) > item.points) continue;
+    const supportingScore = scoreCase(item, progress(item, { usedInvestigations: selected.map((check) => check.id) }));
+    assert.ok(supportingScore.investigation < 25, "Dates, metadata and comments cannot replace direct confirmation");
+  }
+});
+
 test("legacy four-case runs retain the 400 point scale", () => {
   const investigations = [
     ["check_official", "check_source", "check_author"],

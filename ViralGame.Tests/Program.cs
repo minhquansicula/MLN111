@@ -61,10 +61,21 @@ var perfectRun = truthScoring.Score("participant", "Lan", new SubmitRunRequest(
     [
         TruthCase("case_01", "TRUE", "FALSE", 100, "REPORT", "check_official", "check_source", "check_author"),
         TruthCase("case_02", "TRUE", "MISLEADING", 100, "ADD_CONTEXT", "check_statistics", "check_sample", "check_source"),
-        TruthCase("case_03", "FALSE", "TRUE", 100, "SHARE", "view_full_context", "check_official"),
+        TruthCase("case_03", "FALSE", "TRUE", 100, "ADD_CONTEXT", "view_full_context", "check_official"),
         TruthCase("case_04", "TRUE", "NOT_ENOUGH_EVIDENCE", 100, "WAIT_FOR_MORE_EVIDENCE", "check_source", "check_image", "check_date", "search_other_news"),
     ]));
 Check(perfectRun.Score.Total == 400 && perfectRun.Score.Accuracy == 160, "Truth Rush scoring uses the 400 point scale");
+var supportingOnlyCases = perfectRun.Cases.Select(item => item.CaseId == "case_03"
+    ? TruthCase("case_03", "FALSE", "TRUE", 100, "ADD_CONTEXT", "check_date", "check_metadata", "check_comments")
+    : new SubmittedCase(item.CaseId, item.InitialVerdict, item.FinalVerdict, item.Confidence, item.ResponsibleAction, item.UsedInvestigations)).ToArray();
+var supportingOnlyResult = truthScoring.Score("participant", "Lan", new SubmitRunRequest("token", "supporting-only", 600, supportingOnlyCases));
+var supportingOnlyCase = supportingOnlyResult.Cases.Single(item => item.CaseId == "case_03");
+Check(supportingOnlyCase.Score.Investigation == 12 && supportingOnlyCase.Score.Responsibility == 20,
+    "AI permission rewards conditions without overvaluing dates and metadata");
+var plainShareCases = supportingOnlyCases.Select(item => item.CaseId == "case_03" ? item with { ResponsibleAction = "SHARE" } : item).ToArray();
+var plainShareResult = truthScoring.Score("participant", "Lan", new SubmitRunRequest("token", "plain-share", 600, plainShareCases));
+Check(plainShareResult.Cases.Single(item => item.CaseId == "case_03").Score.Responsibility == 10,
+    "Sharing AI permission without its conditions earns less responsibility credit");
 var budgetRejected = false;
 try
 {

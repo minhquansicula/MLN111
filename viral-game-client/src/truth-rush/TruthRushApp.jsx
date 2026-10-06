@@ -388,9 +388,9 @@ function FinalVerdictScreen({ progress, onChoose }) {
   );
 }
 
-function ConfidenceScreen({ onChoose }) {
+function ConfidenceScreen({ progress, onChoose }) {
   return (
-    <DecisionLayout eyebrow="HIỆU CHỈNH ĐỘ TIN CẬY" title="Bạn chắc chắn đến mức nào?" hint="Tự tin cao được thưởng nhiều hơn khi đúng, nhưng cũng bị trừ nhiều hơn khi sai.">
+    <DecisionLayout eyebrow="HIỆU CHỈNH ĐỘ TIN CẬY" title="Bạn chắc chắn đến mức nào?" hint={<>Bạn tự tin đến mức nào vào phán quyết “{verdictLabel(progress.finalVerdict)}”? Tự tin cao được thưởng nhiều hơn khi phán quyết đúng, nhưng bị trừ nhiều hơn khi sai.{progress.finalVerdict === "NOT_ENOUGH_EVIDENCE" && <> Ở đây, độ tự tin thể hiện mức chắc chắn rằng bằng chứng hiện tại chưa đủ để kết luận; không phải xác suất sự việc có xảy ra.</>}</>}>
       <div className="tr-confidence">
         {[50, 60, 70, 80, 90, 100].map((value) => (
           <button key={value} onClick={() => onChoose(value)}><CircleGauge size={21} /><b>{value}%</b></button>
@@ -774,7 +774,7 @@ export function TruthRushApp() {
     setEvidence(check);
   }} onFinish={() => commit((next) => { next.cases[next.caseIndex].step = "FINAL"; })} />;
   if (progress.step === "FINAL") content = <FinalVerdictScreen progress={progress} onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.finalVerdict = value; item.step = "CONFIDENCE"; })} />;
-  if (progress.step === "CONFIDENCE") content = <ConfidenceScreen onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.confidence = value; item.step = "ACTION"; })} />;
+  if (progress.step === "CONFIDENCE") content = <ConfidenceScreen progress={progress} onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.confidence = value; item.step = "ACTION"; })} />;
   if (progress.step === "ACTION") content = <ActionScreen onChoose={(value) => commit((next) => { const item = next.cases[next.caseIndex]; item.responsibleAction = value; item.score = scoreCase(caseData, item); item.step = "REVEAL"; })} />;
   const currentScore = totalScore(run);
   const cumulativeBefore = run.cases.slice(0, run.caseIndex).reduce((sum, item) => sum + (item.score?.total ?? 0), 0);
